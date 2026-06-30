@@ -1,0 +1,37 @@
+{
+  "name": "fleet-telemetry-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 3000",
+    "build:e2e": "next build",
+    "start:e2e": "next start -H 0.0.0.0 -p 3000",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "node scripts/run-e2e.mjs",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "dependencies": {
+    "@types/leaflet": "^1.9.21",
+    "leaflet": "^1.9.4",
+    "next": "^13.4.10",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^6.0.3",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.9"
+  }
+}

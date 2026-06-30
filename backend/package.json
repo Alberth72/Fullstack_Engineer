@@ -1,0 +1,47 @@
+{
+  "name": "fleet-telemetry-backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "ts-node-dev --respawn src/index.ts",
+    "dev:worker": "ts-node-dev --respawn src/worker.ts",
+    "simulate:telemetry": "ts-node-dev --respawn src/simulator/telemetrySimulator.ts",
+    "simulate:telemetry:once": "ts-node-dev --transpile-only src/simulator/telemetrySimulator.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:worker": "node dist/worker.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:integration": "cross-env RUN_INTEGRATION=true DATABASE_URL=postgres://fleet:fleet@localhost:5432/fleet RABBITMQ_URL=amqp://guest:guest@localhost:5672 BROKER_QUEUE_NAME=telemetry.ws.integration AGENT_MOCK=true vitest run tests/integration"
+  },
+  "dependencies": {
+    "@langchain/openai": "^1.5.3",
+    "@types/amqplib": "^0.10.8",
+    "@types/pg": "^8.20.0",
+    "amqplib": "^2.0.1",
+    "axios": "^1.7.0",
+    "express": "^4.18.2",
+    "langchain": "^1.5.2",
+    "openai": "^4.0.0",
+    "pg": "^8.22.0",
+    "uuid": "^9.0.0",
+    "ws": "^8.13.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.17",
+    "@types/node": "^20.11.0",
+    "@types/supertest": "^6.0.2",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.9",
+    "@vitest/coverage-v8": "^3.2.6",
+    "@vitest/ui": "^3.2.4",
+    "cross-env": "^10.1.0",
+    "supertest": "^7.1.4",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.2",
+    "vitest": "^3.2.4"
+  }
+}

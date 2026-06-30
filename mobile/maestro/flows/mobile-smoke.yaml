@@ -1,0 +1,40 @@
+appId: com.fullstackengineer.fleetdriver
+---
+- launchApp:
+    clearState: true
+
+- assertVisible: "Fleet Driver"
+
+- tapOn:
+    id: "driver-name-input"
+- eraseText
+- inputText: "Laura Demo"
+
+- tapOn:
+    id: "vehicle-id-input"
+- eraseText
+- inputText: "veh-maestro-1"
+
+- tapOn:
+    id: "route-id-input"
+- eraseText
+- inputText: "route-demo"
+
+- tapOn:
+    id: "save-driver-button"
+
+- tapOn:
+    id: "start-tracking-button"
+
+- tapOn:
+    id: "add-demo-route-button"
+
+- assertVisible: "Ultimo fix"
+- assertVisible: "vehicle_started"
+- assertVisible: "geofence_enter"
+
+- tapOn:
+    id: "sync-button"
+
+- assertVisible: "Ultimo lote"
+- assertVisible: "Aceptados:"

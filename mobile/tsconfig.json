@@ -1,0 +1,18 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@mobile/*": [
+        "src/*"
+      ]
+    }
+  },
+  "include": [
+    "App.tsx",
+    "src",
+    "test"
+  ]
+}

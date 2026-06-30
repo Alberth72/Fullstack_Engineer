@@ -1,0 +1,30 @@
+# Cursor Rules for Fullstack_Engineer
+
+## Mission
+- Keep the fleet portal lightweight, operational, and realistic.
+- Preserve RabbitMQ for events and TimescaleDB for telemetry.
+- Prefer changes that reduce memory, tokens, and unnecessary services.
+
+## Agent Workflow
+- Classify the user intent before calling LangChain.
+- Use deterministic rules for simple fleet questions: counts, stopped vehicles, offline vehicles, and follow-ups that only repeat a previous count.
+- Send compact context to the model: summary, a tiny fleet sample, and only the last relevant turns.
+- Do not expose raw JSON to the chat UI. The UI should render the natural-language `reply`.
+- Keep responses brief, operational, and truthful.
+- If a fact is missing, say so instead of inventing it.
+
+## Prompting
+- Prefer a specialized prompt for the fleet operator role.
+- Add short examples for the most common operational questions.
+- Avoid giant context dumps and avoid full conversation history unless strictly needed.
+
+## Code Changes
+- Inspect the relevant backend, frontend, and docs files before editing.
+- Make small cohesive edits.
+- Update tests when behavior changes.
+- Update docs when the architecture or contract changes.
+
+## Local Run
+- Work in the lightest mode possible.
+- Start only the services required for the current task.
+- Avoid loading extra containers or datasets unless the change needs them.

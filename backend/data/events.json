@@ -1,0 +1,65 @@
+[
+  {
+    "id": "76d58e5a-3b49-4817-a351-93a7dedab76b",
+    "vehicle_id": "veh-1",
+    "latitude": 19.43,
+    "longitude": -99.13,
+    "speed": 0,
+    "status": "stopped",
+    "timestamp": 1782357714434
+  },
+  {
+    "id": "80ee97e6-0535-4575-bf4b-dadd151fd132",
+    "vehicle_id": "veh-1",
+    "latitude": 19.43,
+    "longitude": -99.13,
+    "speed": 0,
+    "status": "stopped",
+    "timestamp": 1782357893429
+  },
+  {
+    "id": "0063be93-bb29-40ab-80bb-4332229778aa",
+    "vehicle_id": "veh-1",
+    "latitude": 19.43,
+    "longitude": -99.13,
+    "speed": 0,
+    "status": "stopped",
+    "timestamp": 1782358079328
+  },
+  {
+    "id": "cd5faf72-ff1c-4d74-a0ab-d40c59c7b326",
+    "vehicle_id": "veh-batch-1",
+    "latitude": 19.4326,
+    "longitude": -99.1332,
+    "speed": 0,
+    "status": "stopped",
+    "timestamp": 1782449297771
+  },
+  {
+    "id": "27ed2656-5264-470b-9c24-fccbb4c86ecd",
+    "vehicle_id": "veh-batch-2",
+    "latitude": 19.44,
+    "longitude": -99.14,
+    "speed": 52,
+    "status": "moving",
+    "timestamp": 1782449297771
+  },
+  {
+    "id": "d9c24fde-4c9c-4d07-8989-98c50cc1e91e",
+    "vehicle_id": "veh-batch-3",
+    "latitude": 19.45,
+    "longitude": -99.15,
+    "speed": 34,
+    "status": "moving",
+    "timestamp": 1782449297771
+  },
+  {
+    "id": "int-agent-1",
+    "vehicle_id": "veh-agent-1",
+    "latitude": 19.4326,
+    "longitude": -99.1332,
+    "speed": 61,
+    "status": "moving",
+    "timestamp": 1782449327932
+  }
+]

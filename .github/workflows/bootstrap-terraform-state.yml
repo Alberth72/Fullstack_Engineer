@@ -1,0 +1,44 @@
+name: bootstrap-terraform-state
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  TF_STATE_BUCKET: fleet-telemetry-tfstate
+  TF_LOCK_TABLE: fleet-telemetry-tf-locks
+
+jobs:
+  bootstrap-state:
+    name: Create Terraform remote state backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform init
+        working-directory: infra/terraform-bootstrap
+        run: terraform init -input=false
+
+      - name: Terraform apply
+        working-directory: infra/terraform-bootstrap
+        env:
+          TF_VAR_state_bucket_name: ${{ env.TF_STATE_BUCKET }}
+          TF_VAR_lock_table_name: ${{ env.TF_LOCK_TABLE }}
+        run: terraform apply -input=false -auto-approve

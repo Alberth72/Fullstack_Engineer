@@ -1,0 +1,43 @@
+services:
+  backend:
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://fleet:fleet@postgres:5432/fleet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      OUTBOX_WORKER_URL: http://worker:4002
+      OUTBOX_CLAIM_LIMIT: ${OUTBOX_CLAIM_LIMIT:-250}
+      OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-500}
+
+  simulator:
+    depends_on:
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://fleet:fleet@postgres:5432/fleet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      TELEMETRY_SIM_VEHICLES: 5
+
+  worker:
+    depends_on:
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      OUTBOX_CLAIM_LIMIT: ${OUTBOX_CLAIM_LIMIT:-250}
+      OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-500}
+
+  frontend:
+    depends_on:
+      backend:
+        condition: service_healthy

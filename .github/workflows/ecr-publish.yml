@@ -1,0 +1,57 @@
+name: build-push-ecr
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/ecr-publish.yml"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: fleet-telemetry-dev
+
+jobs:
+  build-and-push:
+    name: Build and push backend image to ECR
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tags
+        run: |
+          echo "IMAGE_TAG_SHA=${GITHUB_SHA}" >> $GITHUB_ENV
+          echo "IMAGE_REPOSITORY=${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY}" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile.ecs
+          push: true
+          tags: |
+            ${{ env.IMAGE_REPOSITORY }}:latest
+            ${{ env.IMAGE_REPOSITORY }}:${{ env.IMAGE_TAG_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

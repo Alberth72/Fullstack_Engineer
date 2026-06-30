@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "fleet_count_basic",
+      "question": "cuantos vehiculos hay en la flota?",
+      "context": {
+        "fleetSize": 5,
+        "fleetSummary": {
+          "totalVehicles": 5,
+          "moving": 3,
+          "stopped": 2,
+          "offline": 0,
+          "online": 5
+        },
+        "fleetState": [],
+        "recentConversation": []
+      },
+      "options": {
+        "specialist": "fleet_ops",
+        "conversationHistory": []
+      },
+      "expected": {
+        "mode": "rules",
+        "intent": "count_fleet",
+        "tool": "getFleetSummary",
+        "message": "En este momento hay 5 vehiculos en la flota: 3 en movimiento, 2 detenidos y 0 offline."
+      }
+    },
+    {
+      "id": "stopped_count_basic",
+      "question": "cuantos vehiculos detenidos hay?",
+      "context": {
+        "fleetSize": 5,
+        "fleetSummary": {
+          "totalVehicles": 5,
+          "moving": 3,
+          "stopped": 2,
+          "offline": 0,
+          "online": 5
+        },
+        "fleetState": [],
+        "recentConversation": []
+      },
+      "options": {
+        "specialist": "fleet_ops",
+        "conversationHistory": []
+      },
+      "expected": {
+        "mode": "rules",
+        "intent": "count_stopped",
+        "tool": "getFleetSummary",
+        "message": "Hay 2 vehiculos detenidos."
+      }
+    },
+    {
+      "id": "offline_count_basic",
+      "question": "cuantos vehiculos estan fuera de servicio?",
+      "context": {
+        "fleetSize": 5,
+        "fleetSummary": {
+          "totalVehicles": 5,
+          "moving": 3,
+          "stopped": 0,
+          "offline": 2,
+          "online": 3
+        },
+        "fleetState": [],
+        "recentConversation": []
+      },
+      "options": {
+        "specialist": "fleet_ops",
+        "conversationHistory": []
+      },
+      "expected": {
+        "mode": "rules",
+        "intent": "count_offline",
+        "tool": "getFleetSummary",
+        "message": "Hay 2 vehiculos offline."
+      }
+    },
+    {
+      "id": "list_stopped_basic",
+      "question": "cuales vehiculos estan detenidos?",
+      "context": {
+        "fleetSize": 5,
+        "fleetSummary": {
+          "totalVehicles": 5,
+          "moving": 3,
+          "stopped": 2,
+          "offline": 0,
+          "online": 5
+        },
+        "fleetState": [
+          {
+            "vehicle_id": "veh-1",
+            "status": "moving",
+            "speed": 42
+          },
+          {
+            "vehicle_id": "veh-2",
+            "status": "stopped",
+            "speed": 0
+          },
+          {
+            "vehicle_id": "veh-4",
+            "status": "stopped",
+            "speed": 0
+          }
+        ],
+        "recentConversation": []
+      },
+      "options": {
+        "specialist": "fleet_ops",
+        "conversationHistory": []
+      },
+      "expected": {
+        "mode": "rules",
+        "intent": "list_stopped",
+        "tool": "getStoppedVehicles",
+        "message": "Hay 2 vehiculos detenidos: veh-2, veh-4."
+      }
+    },
+    {
+      "id": "follow_up_stopped_count",
+      "question": "y cuantos son?",
+      "context": {
+        "fleetSize": 5,
+        "fleetSummary": {
+          "totalVehicles": 5,
+          "moving": 3,
+          "stopped": 2,
+          "offline": 0,
+          "online": 5
+        },
+        "fleetState": [],
+        "recentConversation": []
+      },
+      "options": {
+        "specialist": "fleet_ops",
+        "conversationHistory": [
+          {
+            "turnIndex": 1,
+            "question": "que vehiculos estan detenidos en zonas criticas?",
+            "answer": {
+              "specialist": "fleet_ops",
+              "intent": "tool_getStoppedVehiclesInCriticalZones",
+              "query": "que vehiculos estan detenidos en zonas criticas?",
+              "result": [
+                {
+                  "vehicle_id": "veh-2"
+                }
+              ],
+              "tool": "getStoppedVehiclesInCriticalZones"
+            },
+            "createdAt": 1700000000000
+          }
+        ]
+      },
+      "expected": {
+        "mode": "rules",
+        "intent": "count_stopped",
+        "tool": "getFleetSummary",
+        "message": "Hay 2 vehiculos detenidos."
+      }
+    },
+    {
+      "id": "general_status_mock",
+      "question": "como va la operacion hoy?",
+      "context": {
+        "fleetSize": 5,
+        "fleetSummary": {
+          "totalVehicles": 5,
+          "moving": 3,
+          "stopped": 2,
+          "offline": 0,
+          "online": 5
+        },
+        "fleetState": [],
+        "recentConversation": []
+      },
+      "options": {
+        "specialist": "fleet_ops",
+        "conversationHistory": []
+      },
+      "expected": {
+        "mode": "mock",
+        "intent": "general_query",
+        "tool": "getFleetSummary",
+        "message": "Veo 5 vehiculos en la flota. Si quieres, puedo detallarte un vehiculo, las zonas criticas o los detenidos."
+      }
+    }
+  ]
+}

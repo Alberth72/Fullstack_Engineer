@@ -1,0 +1,5 @@
+bucket         = "fleet-telemetry-tfstate"
+key            = "fleet-telemetry/dev/terraform.tfstate"
+region         = "us-east-1"
+dynamodb_table = "fleet-telemetry-tf-locks"
+encrypt        = true

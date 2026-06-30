@@ -1,0 +1,9 @@
+aws_region = "us-east-1"
+project_name = "fleet-telemetry"
+environment = "dev"
+mq_broker_username = "fleet"
+mq_broker_password = "change-me-strong-password"
+mq_engine_version = "3.13.0"
+mq_host_instance_type = "mq.t3.micro"
+db_password = "change-me-strong-password"
+agent_mock = true

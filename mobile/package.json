@@ -1,0 +1,35 @@
+{
+  "name": "fleet-driver-mobile",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Offline-first driver app foundation for fleet telemetry capture",
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "start:dev-client": "expo start --dev-client",
+    "android": "expo start --android",
+    "android:dev-client": "expo start --android --dev-client",
+    "ios": "expo start --ios",
+    "ios:dev-client": "expo start --ios --dev-client",
+    "web": "expo start --web",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node ./scripts/smoke.mjs",
+    "test:maestro": "maestro test maestro/flows/mobile-smoke.yaml"
+  },
+  "dependencies": {
+    "expo": "^56.0.0",
+    "expo-dev-client": "^6.0.21",
+    "expo-location": "^56.0.18",
+    "expo-sqlite": "^56.0.5",
+    "expo-status-bar": "^2.2.3",
+    "expo-task-manager": "^56.0.19",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "react-native": "0.82.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.10",
+    "babel-preset-expo": "^56.0.0",
+    "typescript": "^5.6.3"
+  }
+}

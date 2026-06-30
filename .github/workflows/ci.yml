@@ -1,0 +1,124 @@
+name: project-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend checks and integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run unit and route tests
+        working-directory: backend
+        run: npm test
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Start TimescaleDB and RabbitMQ
+        run: docker compose -f infra/docker-compose.yml up -d postgres rabbitmq
+
+      - name: Run integration tests
+        working-directory: backend
+        run: npm run test:integration
+
+      - name: Stop compose stack
+        if: always()
+        run: docker compose -f infra/docker-compose.yml down -v --remove-orphans
+
+  infra:
+    name: Infra checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate light Compose config
+        run: docker compose -f infra/docker-compose.yml config
+
+      - name: Validate full Compose config
+        run: docker compose -f infra/docker-compose.yml -f infra/docker-compose.full.yml --profile full config
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive infra/terraform infra/terraform-bootstrap
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  mobile:
+    name: Mobile checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Typecheck mobile app
+        working-directory: mobile
+        run: npm run typecheck
+
+      - name: Run mobile smoke test
+        working-directory: mobile
+        run: npm test
