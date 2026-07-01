@@ -13,7 +13,7 @@ type SimulationState = VehicleSeed & {
 };
 
 const DEFAULT_INTERVAL_MS = parseInt(process.env.TELEMETRY_SIM_INTERVAL_MS || "2000", 10);
-const DEFAULT_VEHICLE_COUNT = parseInt(process.env.TELEMETRY_SIM_VEHICLES || "6", 10);
+const DEFAULT_VEHICLE_COUNT = parseInt(process.env.TELEMETRY_SIM_VEHICLES || "3", 10);
 const DEFAULT_BATCH_SIZE = Math.max(
   1,
   parseInt(process.env.TELEMETRY_SIM_BATCH_SIZE || "25", 10) || 25
