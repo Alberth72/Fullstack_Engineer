@@ -1,6 +1,7 @@
 import { telemetryApplication } from "../application/telemetry";
 import { getTelemetryOutboxWorkerConfig } from "../events/outboxWorkerConfig";
 import { getOutboxSummary } from "../storage/telemetryOutbox";
+import { getTelemetryRetentionPolicy } from "../storage/telemetryRetentionPolicy";
 
 export const recordEvent = telemetryApplication.recordEvent;
 export const recordEvents = telemetryApplication.recordEvents;
@@ -16,3 +17,4 @@ export const getStoppedVehiclesInCriticalZones =
   telemetryApplication.getStoppedVehiclesInCriticalZones;
 export const getTelemetryOutboxSummary = getOutboxSummary;
 export const getTelemetryOutboxWorkerEffectiveConfig = getTelemetryOutboxWorkerConfig;
+export const getTelemetryRetentionEffectivePolicy = getTelemetryRetentionPolicy;

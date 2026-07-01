@@ -10,7 +10,7 @@ MVP para monitoreo de flotas con ingesta de telemetria, agente IA, dashboard ope
 - Agente IA tool-enabled sobre LangChain con modo mock cuando no hay API key.
 - Suite de pruebas con Vitest, Supertest e integracion real contra Docker Compose.
 - Frontend Next.js con mapa, alertas, metricas, detalle de vehiculo y chat IA.
-- Infra local con Docker Compose, prueba de carga k6 y base Terraform para AWS.
+- Infra local con Docker Compose, prueba de carga k6, Terraform para AWS y CD hacia ECS/Fargate.
 - Mobile offline-first: base Expo/React Native con cola SQLite, fallback en memoria, demo route y sync por lotes.
 
 ## Stack tecnologico
@@ -20,7 +20,7 @@ MVP para monitoreo de flotas con ingesta de telemetria, agente IA, dashboard ope
 - Datos: TimescaleDB sobre PostgreSQL, con fallback JSON local.
 - Mensajeria: RabbitMQ.
 - Observabilidad: `/health`, `/metrics`, request ids, counters y timings.
-- Infra: Docker Compose, k6, Terraform para AWS.
+- Infra: Docker Compose, k6, Terraform para AWS, ECR, ECS/Fargate y GitHub Actions CD.
 - Mobile: Expo/React Native offline-first con TypeScript, SQLite, cola local y sync batch contra el backend.
 
 ## Arquitectura rapida
@@ -81,6 +81,8 @@ npm run dev
 - `TELEMETRY_SIM_INTERVAL_MS`
 - `TELEMETRY_SIM_BATCH_SIZE`
 - `TELEMETRY_INSERT_CHUNK_SIZE`
+- `TELEMETRY_RETENTION_DAYS`
+- `JSON_STORAGE_MAX_EVENTS_PER_VEHICLE`
 - `JSON_BODY_LIMIT`
 - `CORS_ALLOWED_ORIGINS`
 - `ADMIN_API_TOKEN`
@@ -114,6 +116,7 @@ npm run dev
 | `GET` | `/api/telemetry/admin/outbox` | Ver backlog, retries y dead letters del outbox |
 | `GET` | `/api/telemetry/admin/outbox/config` | Ver configuracion efectiva del worker de outbox |
 | `GET` | `/api/telemetry/admin/ingestion` | Ver eventos recibidos, nuevos, actualizados y duplicados |
+| `GET` | `/api/telemetry/admin/retention` | Ver retencion Timescale y compactacion JSON efectivas |
 | `POST` | `/api/agent/query` | Consultar al agente IA y obtener una respuesta natural |
 | `GET` | `/api/agent/conversations/:conversationId/traces` | Consultar trazas auditables de una conversacion IA |
 | `GET` | `/api/agent/admin/config` | Ver configuracion efectiva de auditoria IA |
@@ -131,7 +134,7 @@ npm run dev
 
 Vitest ejecuta la suite y Supertest se usa para golpear la app Express directamente, sin levantar el puerto real.
 La suite de integracion valida persistencia, publicacion en RabbitMQ y rutas HTTP usando servicios reales de Compose.
-La workflow `project-ci` ejecuta backend, infra, frontend y mobile en GitHub Actions.
+La workflow `project-ci` ejecuta backend, infra, frontend y mobile en GitHub Actions. Si pasa en `main`, `build-push-ecr` publica imagenes backend/frontend en ECR y `deploy-terraform` actualiza ECS/Fargate con rollback nativo. La guia operativa esta en [docs/continuous-deployment.md](/D:/Github/Fullstack_Engineer/docs/continuous-deployment.md).
 
 Si usas VS Code, instala la extension de Vitest y abre la vista `Testing`. Ahi veras los archivos, suites y casos ejecutados en forma de arbol, con ejecucion individual por test.
 
@@ -163,9 +166,17 @@ Si usas VS Code, instala la extension de Vitest y abre la vista `Testing`. Ahi v
 
 La postura completa esta en [docs/security-mvp.md](/D:/Github/Fullstack_Engineer/docs/security-mvp.md).
 
+## Despliegue continuo
+- `project-ci` valida backend, frontend, mobile e infraestructura.
+- `build-push-ecr` corre despues de CI exitoso en `main` y publica imagenes por SHA para backend/worker y tags `frontend-*` para frontend.
+- `deploy-terraform` aplica esos tags en AWS con Terraform remoto, ALB compartido, servicios ECS privados y circuit breaker de despliegue.
+- El portal queda en `/`; backend, health, metrics y WebSocket se enrutan por `/api`, `/health`, `/metrics` y `/ws`.
+
+Revisa [docs/continuous-deployment.md](/D:/Github/Fullstack_Engineer/docs/continuous-deployment.md) para secretos, validacion y rollback.
+
 ## Pendientes del MVP
 - Completar mobile offline-first con captura GPS real en background, permisos, pruebas en dispositivo y CI/CD movil.
-- CI/CD para frontend y mobile. El backend ya tiene pruebas unitarias, rutas, build e integracion real automatizadas.
+- CD movil con artefactos instalables y distribucion controlada; backend/frontend ya tienen CI y despliegue continuo hacia AWS.
 - Validacion de carga y resiliencia con mas volumen real sobre TimescaleDB y RabbitMQ, incluyendo escenarios con lote.
 - Observabilidad mas completa con logs estructurados y trazas.
 - Cierre incremental de Backend / Events documentado en `docs/backend-events-workflow.md`.

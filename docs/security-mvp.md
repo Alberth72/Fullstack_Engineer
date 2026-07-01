@@ -28,6 +28,7 @@ Cuando se define, estos endpoints requieren `Authorization: Bearer <token>` o `X
 - `GET /api/telemetry/admin/outbox`
 - `GET /api/telemetry/admin/outbox/config`
 - `GET /api/telemetry/admin/ingestion`
+- `GET /api/telemetry/admin/retention`
 - `GET /api/agent/admin/config`
 - `GET /api/agent/conversations/:conversationId/traces`
 - `POST /internal/outbox/notify` en el worker

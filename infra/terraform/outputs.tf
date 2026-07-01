@@ -34,7 +34,7 @@ output "backend_repository_url" {
 }
 
 output "ecr_repository_name" {
-  description = "ECR repository name used by backend and worker."
+  description = "ECR repository name used by backend, worker and frontend."
   value       = aws_ecr_repository.backend.name
 }
 
@@ -43,9 +43,24 @@ output "ecs_cluster_name" {
   value       = aws_ecs_cluster.main.name
 }
 
-output "backend_url" {
-  description = "Public URL of the backend application load balancer."
+output "portal_url" {
+  description = "Public URL of the frontend portal application load balancer."
   value       = "http://${aws_lb.backend.dns_name}"
+}
+
+output "backend_url" {
+  description = "Public URL of the backend behind the shared application load balancer."
+  value       = "http://${aws_lb.backend.dns_name}/api"
+}
+
+output "backend_health_url" {
+  description = "Public health URL of the backend behind the shared application load balancer."
+  value       = "http://${aws_lb.backend.dns_name}/health"
+}
+
+output "backend_internal_url" {
+  description = "Internal DNS name used by private services to reach the backend."
+  value       = local.backend_internal_url
 }
 
 output "worker_service_url" {

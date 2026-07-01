@@ -42,6 +42,28 @@ resource "aws_security_group" "worker_tasks" {
   tags = local.common_tags
 }
 
+resource "aws_security_group" "frontend_tasks" {
+  name        = "${local.name_prefix}-frontend-tasks"
+  description = "Security group for the frontend ECS tasks"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = local.common_tags
+}
+
 resource "aws_ecs_cluster" "main" {
   name = local.name_prefix
 
@@ -65,9 +87,17 @@ resource "aws_cloudwatch_log_group" "worker" {
   tags              = local.common_tags
 }
 
+resource "aws_cloudwatch_log_group" "frontend" {
+  name              = "/ecs/${local.name_prefix}/frontend"
+  retention_in_days = 14
+  tags              = local.common_tags
+}
+
 locals {
-  backend_image = "${aws_ecr_repository.backend.repository_url}:${var.image_tag}"
-  worker_url    = "http://${aws_service_discovery_service.worker.name}.${aws_service_discovery_private_dns_namespace.main.name}:4002"
+  backend_image        = "${aws_ecr_repository.backend.repository_url}:${var.image_tag}"
+  frontend_image       = "${aws_ecr_repository.backend.repository_url}:${var.frontend_image_tag}"
+  backend_internal_url = "http://${aws_service_discovery_service.backend.name}.${aws_service_discovery_private_dns_namespace.main.name}:4001"
+  worker_url           = "http://${aws_service_discovery_service.worker.name}.${aws_service_discovery_private_dns_namespace.main.name}:4002"
 
   backend_env = [
     {
@@ -124,6 +154,29 @@ locals {
     {
       name  = "JSON_BODY_LIMIT"
       value = "2mb"
+    }
+  ]
+
+  frontend_env = [
+    {
+      name  = "NODE_ENV"
+      value = "production"
+    },
+    {
+      name  = "PORT"
+      value = "3000"
+    },
+    {
+      name  = "NEXT_PUBLIC_API_BASE"
+      value = "/api"
+    },
+    {
+      name  = "NEXT_PUBLIC_WS_URL"
+      value = ""
+    },
+    {
+      name  = "BACKEND_INTERNAL_URL"
+      value = local.backend_internal_url
     }
   ]
 }
@@ -197,6 +250,40 @@ resource "aws_ecs_task_definition" "worker" {
   ])
 }
 
+resource "aws_ecs_task_definition" "frontend" {
+  family                   = "${local.name_prefix}-frontend"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.ecs_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "frontend"
+      image     = local.frontend_image
+      essential = true
+      portMappings = [
+        {
+          containerPort = 3000
+          hostPort      = 3000
+          protocol      = "tcp"
+        }
+      ]
+      environment = local.frontend_env
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.frontend.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "frontend"
+        }
+      }
+    }
+  ])
+}
+
 resource "aws_ecs_service" "backend" {
   name                              = "${local.name_prefix}-backend"
   cluster                           = aws_ecs_cluster.main.id
@@ -222,10 +309,49 @@ resource "aws_ecs_service" "backend" {
     container_port   = 4001
   }
 
+  service_registries {
+    registry_arn   = aws_service_discovery_service.backend.arn
+    container_name = "backend"
+    container_port = 4001
+  }
+
   depends_on = [
     aws_lb_listener.http,
     aws_db_instance.main,
     aws_service_discovery_service.worker
+  ]
+
+  tags = local.common_tags
+}
+
+resource "aws_ecs_service" "frontend" {
+  name                              = "${local.name_prefix}-frontend"
+  cluster                           = aws_ecs_cluster.main.id
+  task_definition                   = aws_ecs_task_definition.frontend.arn
+  desired_count                     = 1
+  launch_type                       = "FARGATE"
+  platform_version                  = "1.4.0"
+  health_check_grace_period_seconds = 60
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
+  network_configuration {
+    subnets          = values(aws_subnet.private)[*].id
+    security_groups  = [aws_security_group.frontend_tasks.id]
+    assign_public_ip = false
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.frontend.arn
+    container_name   = "frontend"
+    container_port   = 3000
+  }
+
+  depends_on = [
+    aws_lb_listener.http,
+    aws_ecs_service.backend
   ]
 
   tags = local.common_tags

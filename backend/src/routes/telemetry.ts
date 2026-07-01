@@ -165,6 +165,16 @@ router.get("/admin/ingestion", (_req, res) => {
   });
 });
 
+router.get("/admin/retention", (_req, res) => {
+  try {
+    res.json(telemetryService.getTelemetryRetentionEffectivePolicy());
+  } catch (err) {
+    incrementCounter("telemetryErrors");
+    logger.error("telemetry_retention_policy_failed", err);
+    res.status(500).json({ error: "internal_error" });
+  }
+});
+
 router.get("/vehicle/:id/events", async (req, res) => {
   try {
     const vehicleId = req.params.id;

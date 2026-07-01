@@ -13,6 +13,7 @@ import {
   emptyTelemetryWriteResult,
   type TelemetryWriteResult,
 } from "./telemetryWriteStats";
+import { getPostgresTelemetryRetentionDays } from "./telemetryRetentionPolicy";
 
 const connectionString =
   process.env.DATABASE_URL || "postgres://fleet:fleet@localhost:5432/fleet";
@@ -36,6 +37,7 @@ let initialized = false;
 
 async function ensureSchema() {
   if (initialized) return;
+  const retentionDays = getPostgresTelemetryRetentionDays();
 
   await pool.query(`CREATE EXTENSION IF NOT EXISTS timescaledb;`).catch(() => null);
 
@@ -118,7 +120,8 @@ async function ensureSchema() {
         END;
 
         BEGIN
-          PERFORM add_retention_policy('telemetry_events', INTERVAL '30 days', if_not_exists => TRUE);
+          PERFORM remove_retention_policy('telemetry_events', if_exists => TRUE);
+          PERFORM add_retention_policy('telemetry_events', INTERVAL '${retentionDays} days', if_not_exists => TRUE);
         EXCEPTION
           WHEN duplicate_object THEN
             NULL;

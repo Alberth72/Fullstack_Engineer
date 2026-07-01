@@ -16,11 +16,11 @@ resource "aws_ecr_lifecycle_policy" "backend" {
     rules = [
       {
         rulePriority = 1
-        description  = "Keep last 20 images"
+        description  = "Keep last 40 image tags"
         selection = {
           tagStatus   = "any"
           countType   = "imageCountMoreThan"
-          countNumber = 20
+          countNumber = 40
         }
         action = {
           type = "expire"

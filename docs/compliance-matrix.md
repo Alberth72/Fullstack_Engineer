@@ -12,7 +12,7 @@ Evaluacion del estado actual del proyecto frente a los requisitos definidos.
 | Area | Requisito | Estado actual | Evidencia | Brecha | Accion recomendada |
 | --- | --- | --- | --- | --- | --- |
 | A. Ingesta orientada a eventos | Stream asincrono con broker RabbitMQ | Cumple | `backend/src/events/broadcaster.ts`, `backend/src/events/outboxNotifier.ts`, `backend/src/events/outboxWorker.ts`, `backend/src/events/outboxWorkerConfig.ts`, `backend/src/events/telemetryConsumers.ts`, `backend/src/worker.ts`, `backend/src/routes/telemetry.ts`, `infra/docker-compose.yml` | El fallback en memoria sigue existiendo para desarrollo, pero no bloquea el flujo real; el outbox ya expone backlog, retries, dead letters, configuracion efectiva del worker e idempotencia por API administrativa | Observar latencia del notificador y comportamiento del worker bajo carga |
-| A. Ingesta orientada a eventos | Persistencia especializada para telemetria temporal | Cumple | `backend/src/storage/pg.ts`, `backend/src/storage/db_json.ts`, `backend/src/storage/telemetryOutbox.ts`, `backend/src/storage/telemetryWriteStats.ts` | La escritura ya mide insertados, actualizados y duplicados; falta validar carga real y afinar retencion/consultas | Ejecutar pruebas de volumen y revisar indices/hypertable |
+| A. Ingesta orientada a eventos | Persistencia especializada para telemetria temporal | Cumple | `backend/src/storage/pg.ts`, `backend/src/storage/db_json.ts`, `backend/src/storage/telemetryOutbox.ts`, `backend/src/storage/telemetryWriteStats.ts`, `backend/src/storage/telemetryRetentionPolicy.ts` | La escritura ya mide insertados, actualizados y duplicados; retencion Timescale y compactacion JSON son configurables y visibles por API administrativa; falta validar carga de mayor duracion | Ejecutar pruebas de volumen mas largas y revisar migracion de hypertable con datos preexistentes |
 | A. Ingesta orientada a eventos | Resiliencia con circuit breaker y retries | Cumple | `backend/src/utils/resilience.ts`, `backend/src/storage/pg.ts`, `backend/src/events/broadcaster.ts`, `backend/src/events/outboxNotifier.ts`, `backend/src/events/outboxWorker.ts` | La politica puede endurecerse mas bajo carga extrema | Observar rate de reintentos y dead-letter con carga real |
 | B. Desarrollo de agente IA | Agente operativo integrado en backend | Cumple | `backend/src/routes/agent.ts`, `backend/src/agent/agentClient.ts`, `backend/src/agent/langchainAgent.ts`, `backend/src/storage/agentAudit.ts`, `backend/src/agent/agentConversation.ts`, `backend/src/agent/agentAuditConfig.ts` | Las trazas ya son consultables, tienen retencion configurable, configuracion visible por API y conversaciones largas compactadas; falta decidir si la politica debe cambiar en runtime | Definir si la configuracion de auditoria debe administrarse dinamicamente fuera de variables de entorno |
 | B. Desarrollo de agente IA | Responder con datos reales y JSON estructurado | Cumple | `backend/src/agent/agentClient.ts`, `backend/src/agent/agentFunctionCaller.ts`, `backend/src/agent/agentResponseSchema.ts` | El contrato ya se valida antes de responder, pero faltan politicas de versionado del schema | Versionar el schema si otros clientes empiezan a consumirlo directamente |
@@ -33,9 +33,8 @@ Evaluacion del estado actual del proyecto frente a los requisitos definidos.
 4. La carga y caos ya tienen un generador k6 alineado al requisito, y Terraform quedo como base formal de IaC con bootstrap de state backend y broker en AWS.
 
 ## Prioridad sugerida
-1. Cerrar Backend / Events hasta 90% usando `docs/backend-events-workflow.md`.
-2. Validacion mobile en dispositivo real y CI/CD movil.
-3. Observabilidad y resiliencia.
-4. Validacion de carga sobre TimescaleDB y RabbitMQ.
-5. CI/CD y automatizacion de despliegue AWS.
-6. Refinamiento del agente IA con versionado formal de schema y posible administracion runtime de auditoria.
+1. Validacion mobile en dispositivo real y CI/CD movil.
+2. Observabilidad y resiliencia.
+3. Validacion de carga extendida sobre TimescaleDB y RabbitMQ.
+4. Ejecutar despliegue AWS end-to-end con credenciales reales.
+5. Refinamiento del agente IA con versionado formal de schema y posible administracion runtime de auditoria.

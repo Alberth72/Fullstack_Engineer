@@ -50,6 +50,26 @@ resource "aws_lb_target_group" "backend" {
   tags = local.common_tags
 }
 
+resource "aws_lb_target_group" "frontend" {
+  name        = substr("${local.name_prefix}-fe-tg", 0, 32)
+  port        = 3000
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = aws_vpc.main.id
+
+  health_check {
+    enabled             = true
+    path                = "/"
+    matcher             = "200-399"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+  tags = local.common_tags
+}
+
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.backend.arn
   port              = 80
@@ -57,6 +77,22 @@ resource "aws_lb_listener" "http" {
 
   default_action {
     type             = "forward"
+    target_group_arn = aws_lb_target_group.frontend.arn
+  }
+}
+
+resource "aws_lb_listener_rule" "backend_operational_paths" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 10
+
+  action {
+    type             = "forward"
     target_group_arn = aws_lb_target_group.backend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api", "/api/*", "/health", "/metrics", "/ws"]
+    }
   }
 }

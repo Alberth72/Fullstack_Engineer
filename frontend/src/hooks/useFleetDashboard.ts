@@ -37,6 +37,20 @@ function createConversationId() {
   return `conv-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function resolveWebSocketUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_WS_URL as string | undefined;
+  if (configuredUrl?.trim()) {
+    return configuredUrl;
+  }
+
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${window.location.host}/ws`;
+  }
+
+  return "ws://localhost:4001/ws";
+}
+
 function readReply(response: AgentResponse) {
   if (typeof response.reply === "string" && response.reply.trim()) {
     return response.reply.trim();
@@ -216,7 +230,7 @@ export function useFleetDashboard() {
 
     try {
       setConnectionStatus("connecting");
-      ws = new WebSocket((process.env.NEXT_PUBLIC_WS_URL as string) || "ws://localhost:4001/ws");
+      ws = new WebSocket(resolveWebSocketUrl());
       ws.onopen = () => setConnectionStatus("connected");
       ws.onmessage = (ev) => {
         try {

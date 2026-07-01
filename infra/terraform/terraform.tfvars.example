@@ -7,3 +7,5 @@ mq_engine_version = "3.13.0"
 mq_host_instance_type = "mq.t3.micro"
 db_password = "change-me-strong-password"
 agent_mock = true
+image_tag = "latest"
+frontend_image_tag = "frontend-latest"

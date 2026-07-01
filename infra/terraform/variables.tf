@@ -52,6 +52,12 @@ variable "image_tag" {
   default     = "latest"
 }
 
+variable "frontend_image_tag" {
+  description = "ECR image tag to deploy for the frontend."
+  type        = string
+  default     = "latest"
+}
+
 variable "mq_broker_username" {
   description = "RabbitMQ broker username managed by Amazon MQ."
   type        = string

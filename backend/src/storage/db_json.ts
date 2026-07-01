@@ -14,6 +14,7 @@ import {
   type TelemetryWriteResult,
 } from "./telemetryWriteStats";
 import { getAgentAuditConfig } from "../agent/agentAuditConfig";
+import { getJsonStorageMaxEventsPerVehicle } from "./telemetryRetentionPolicy";
 
 const dataDir = path.resolve(__dirname, "../../data");
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -22,10 +23,6 @@ const outboxFile = path.join(dataDir, "outbox.json");
 const agentDataDir = path.resolve(process.env.AGENT_AUDIT_DIR || dataDir);
 if (!fs.existsSync(agentDataDir)) fs.mkdirSync(agentDataDir, { recursive: true });
 const agentTraceFile = path.join(agentDataDir, "agent_traces.json");
-const MAX_EVENTS_PER_VEHICLE = Math.max(
-  1,
-  parseInt(process.env.JSON_STORAGE_MAX_EVENTS_PER_VEHICLE || "250", 10) || 250
-);
 
 function readAll(): TelemetryEvent[] {
   try {
@@ -52,9 +49,10 @@ function compactEvents(events: TelemetryEvent[]) {
   }
 
   const compacted: TelemetryEvent[] = [];
+  const maxEventsPerVehicle = getJsonStorageMaxEventsPerVehicle();
   for (const bucket of grouped.values()) {
     bucket.sort((a, b) => b.timestamp - a.timestamp || a.id.localeCompare(b.id));
-    compacted.push(...bucket.slice(0, MAX_EVENTS_PER_VEHICLE));
+    compacted.push(...bucket.slice(0, maxEventsPerVehicle));
   }
 
   return compacted;

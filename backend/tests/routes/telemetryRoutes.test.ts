@@ -14,6 +14,7 @@ vi.mock("../../src/services/telemetryService", () => ({
   getStoppedVehiclesInCriticalZones: vi.fn(),
   getTelemetryOutboxSummary: vi.fn(),
   getTelemetryOutboxWorkerEffectiveConfig: vi.fn(),
+  getTelemetryRetentionEffectivePolicy: vi.fn(),
 }));
 
 import { createApp } from "../../src/app";
@@ -329,6 +330,49 @@ describe("telemetry routes", () => {
       outboxSkipped: expect.any(Number),
       idempotentWrites: expect.any(Number),
     });
+  });
+
+  it("returns the telemetry retention and compaction policy", async () => {
+    const policy = {
+      generatedAt: 1700000000000,
+      activeStorage: "postgres",
+      postgres: {
+        table: "telemetry_events",
+        timeColumn: "timestamp",
+        hypertable: {
+          extension: "timescaledb",
+          mode: "best_effort_on_schema_init",
+        },
+        retention: {
+          enabled: true,
+          days: 45,
+          interval: "45 days",
+          envVar: "TELEMETRY_RETENTION_DAYS",
+          defaultDays: 30,
+        },
+      },
+      json: {
+        storage: "events.json",
+        compaction: {
+          strategy: "latest_events_per_vehicle",
+          maxEventsPerVehicle: 500,
+          envVar: "JSON_STORAGE_MAX_EVENTS_PER_VEHICLE",
+          defaultMaxEventsPerVehicle: 250,
+        },
+      },
+      fallback: {
+        whenPostgresUnavailable: "json_compaction_policy_applies",
+      },
+    };
+
+    mockedTelemetryService.getTelemetryRetentionEffectivePolicy.mockReturnValue(
+      policy as never
+    );
+
+    const res = await request(createApp()).get("/api/telemetry/admin/retention");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(policy);
   });
 
   it("returns vehicle detail when the vehicle exists", async () => {

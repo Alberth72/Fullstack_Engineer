@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const backendInternalUrl = process.env.BACKEND_INTERNAL_URL || "http://localhost:4001";
+
 const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
@@ -20,7 +22,7 @@ const nextConfig = {
       fallback: [
         {
           source: '/api/:path*',
-          destination: 'http://localhost:4001/api/:path*',
+          destination: `${backendInternalUrl}/api/:path*`,
         },
       ],
     };
