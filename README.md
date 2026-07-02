@@ -125,6 +125,7 @@ npm run dev
 | `GET` | `/api/agent/admin/config` | Ver configuracion efectiva de auditoria IA |
 | `GET` | `/health` | Ver estado de salud del backend |
 | `GET` | `/metrics` | Ver metricas basicas del backend |
+| `GET` | `/diagnostics` | Ver diagnostico operacional protegido con health, metricas y ultimos warn/error |
 
 ## Pruebas
 - `cd backend && npm test` ejecuta los tests unitarios una sola vez.

@@ -13,7 +13,7 @@ type DatabaseCheck = {
   mode: "postgres" | "json";
 };
 
-type RuntimeHealth = {
+export type RuntimeHealth = {
   status: "ok" | "degraded";
   timestamp: number;
   broker: "rabbitmq" | "memory";

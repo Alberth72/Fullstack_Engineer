@@ -12,7 +12,7 @@ El proyecto ya no es solo un prototipo de pantalla. La base actual es un portal 
 - dashboard Next.js con mapa, alertas, salud y chat IA
 - agente IA integrado al backend con tools internas
 - trazas persistidas de agente y conversaciones por `conversationId`
-- observabilidad basica con health, metrics y request ids
+- observabilidad con health, metrics, diagnostics, request ids, logs estructurados y buffer reciente de problemas
 
 ## Stack tecnologico
 | Capa | Tecnologia | Rol |
@@ -54,7 +54,7 @@ flowchart TB
     BROKER["RabbitMQ broker"]
     PUB["telemetryPublisher"]
     CONS["telemetryConsumers"]
-    OBS["health + metrics"]
+    OBS["health + metrics + diagnostics"]
   end
 
   subgraph Storage["Storage"]
@@ -179,6 +179,7 @@ El backend expone vistas derivadas en lugar de obligar al frontend a reconstruir
 ## Observabilidad y resiliencia
 - `GET /health` reporta broker, base y estado general.
 - `GET /metrics` expone contadores y tiempos promedio de respuesta.
+- `GET /diagnostics` expone una vista protegida para operadores con runtime health, metricas, contadores de error y ultimos logs `warn`/`error`.
 - `GET /api/telemetry/admin/outbox` expone backlog, retries, bloqueos por backoff y dead letters del outbox sin requerir acceso directo a storage.
 - `GET /api/telemetry/admin/outbox/config` expone intervalo de polling, limite de claim, lock timeout y politicas efectivas de retry/backoff del worker.
 - `POST /api/telemetry/admin/outbox/dead-letters/prune` permite simular por defecto o ejecutar explicitamente la limpieza de dead letters historicos por ventana de antiguedad.
@@ -186,6 +187,8 @@ El backend expone vistas derivadas en lugar de obligar al frontend a reconstruir
 - `GET /api/telemetry/admin/retention` expone la politica efectiva de retencion Timescale y compactacion JSON.
 - `GET /api/telemetry/admin/storage/readiness` expone si TimescaleDB esta instalado, si `telemetry_events` es hypertable, columnas de primary key y bloqueadores de migracion.
 - Cada request recibe `x-request-id`.
+- El logger conserva un buffer pequeno de problemas recientes para correlacion rapida sin depender solo del stdout.
+- Simulador, fallback JSON y adaptadores de fallback Postgres->JSON emiten logs estructurados con `logger` en lugar de `console.*`.
 - Broker, worker y DB usan retries y circuit breaker simple.
 - Si RabbitMQ o PostgreSQL no responden, el sistema sigue operativo en modo degradado.
 
@@ -218,5 +221,5 @@ Con el lote ya tenemos una ruta mucho mas realista para probar 10.000 vehiculos 
 1. Falta validar el rendimiento real de TimescaleDB y RabbitMQ con mas volumen.
 2. Falta ejecutar la migracion formal de hypertable en un ambiente full con datos reales; el SQL y el runtime compatible ya estan versionados.
 3. Falta completar la conexion de secrets y ejecutar el apply real en AWS, aunque IaC y la pipeline de ECR ya tienen una base real en Terraform y GitHub Actions.
-4. Falta observabilidad mas profunda con logs estructurados y trazas.
+4. Falta trazabilidad distribuida completa y alertas operativas; diagnostics y logs secundarios estructurados ya cubren resumen operacional y ultimos problemas.
 5. Falta validar la estrategia del worker bajo carga extrema con resultados de k6.

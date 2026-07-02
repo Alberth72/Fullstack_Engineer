@@ -1,6 +1,7 @@
 import * as db from "./db_json";
 import * as pg from "./pg";
 import type { AgentTraceRecord } from "./agentAuditTypes";
+import { logger } from "../observability/logger";
 import { usePostgresStorage } from "./storageMode";
 
 function isStorageFailure(err: unknown) {
@@ -18,7 +19,11 @@ export async function appendAgentTrace(trace: AgentTraceRecord) {
     if (!isStorageFailure(err)) {
       throw err;
     }
-    console.warn("Postgres unavailable, falling back to JSON storage for agent traces:", err);
+    logger.warn("postgres_fallback_to_json", {
+      component: "agent_audit",
+      operation: "append_trace",
+      error: logger.serializeError(err),
+    });
     db.appendAgentTrace(trace);
   }
 }
@@ -31,7 +36,11 @@ export async function getAgentConversation(conversationId: string, limit = 6) {
   try {
     return await pg.getAgentConversation(conversationId, limit);
   } catch (err) {
-    console.warn("Postgres unavailable, reading agent conversation from JSON storage:", err);
+    logger.warn("postgres_fallback_to_json", {
+      component: "agent_audit",
+      operation: "get_conversation",
+      error: logger.serializeError(err),
+    });
     return db.getAgentConversation(conversationId, limit);
   }
 }
@@ -44,7 +53,11 @@ export async function listAgentTraces(conversationId: string, limit = 20) {
   try {
     return await pg.listAgentTraces(conversationId, limit);
   } catch (err) {
-    console.warn("Postgres unavailable, reading agent traces from JSON storage:", err);
+    logger.warn("postgres_fallback_to_json", {
+      component: "agent_audit",
+      operation: "list_traces",
+      error: logger.serializeError(err),
+    });
     return db.listAgentTraces(conversationId, limit);
   }
 }

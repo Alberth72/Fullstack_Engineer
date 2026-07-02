@@ -1,4 +1,5 @@
 import axios from "axios";
+import { logger } from "../observability/logger";
 
 type VehicleSeed = {
   vehicle_id: string;
@@ -135,9 +136,12 @@ async function runOnce() {
 
 async function runLoop() {
   let fleet = createInitialFleet(DEFAULT_VEHICLE_COUNT);
-  console.log(
-    `[sim] starting telemetry simulator with ${fleet.length} vehicles every ${DEFAULT_INTERVAL_MS}ms spread=${DEFAULT_SPREAD_KM}km batchSize=${DEFAULT_BATCH_SIZE}`
-  );
+  logger.info("telemetry_simulator_started", {
+    vehicles: fleet.length,
+    intervalMs: DEFAULT_INTERVAL_MS,
+    spreadKm: DEFAULT_SPREAD_KM,
+    batchSize: DEFAULT_BATCH_SIZE,
+  });
 
   const tick = async () => {
     fleet = fleet.map((vehicle) => advanceVehicle(vehicle));
@@ -145,20 +149,23 @@ async function runLoop() {
     const sent = await Promise.all(batches.map((batch) => emitTelemetryBatch(batch)));
 
     const totalEvents = sent.reduce((sum, item) => sum + item.count, 0);
-    console.log(`[sim] tick emitted ${totalEvents} events in ${batches.length} batches`);
+    logger.info("telemetry_simulator_tick_emitted", {
+      events: totalEvents,
+      batches: batches.length,
+    });
   };
 
   await tick();
 
   const interval = setInterval(() => {
     tick().catch((err) => {
-      console.error("[sim] telemetry tick failed:", err);
+      logger.error("telemetry_simulator_tick_failed", err);
     });
   }, DEFAULT_INTERVAL_MS);
 
   const shutdown = () => {
     clearInterval(interval);
-    console.log("[sim] telemetry simulator stopped");
+    logger.info("telemetry_simulator_stopped");
     process.exit(0);
   };
 
@@ -174,7 +181,7 @@ async function main() {
     }
     await runLoop();
   } catch (err) {
-    console.error("[sim] simulator failed:", err);
+    logger.error("telemetry_simulator_failed", err);
     process.exit(1);
   }
 }

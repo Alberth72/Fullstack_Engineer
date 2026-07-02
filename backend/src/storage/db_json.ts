@@ -16,6 +16,7 @@ import {
   type TelemetryWriteResult,
 } from "./telemetryWriteStats";
 import { getAgentAuditConfig } from "../agent/agentAuditConfig";
+import { logger } from "../observability/logger";
 import { getJsonStorageMaxEventsPerVehicle } from "./telemetryRetentionPolicy";
 
 const dataDir = path.resolve(__dirname, "../../data");
@@ -32,7 +33,7 @@ function readAll(): TelemetryEvent[] {
     const raw = fs.readFileSync(dbFile, "utf8");
     return JSON.parse(raw) as TelemetryEvent[];
   } catch (err) {
-    console.error("Error leyendo DB JSON:", err);
+    logger.error("json_storage_read_failed", err, { file: "events.json" });
     return [];
   }
 }
@@ -66,7 +67,7 @@ function readOutbox(): TelemetryOutboxRecord[] {
     const raw = fs.readFileSync(outboxFile, "utf8");
     return JSON.parse(raw) as TelemetryOutboxRecord[];
   } catch (err) {
-    console.error("Error leyendo outbox JSON:", err);
+    logger.error("json_storage_read_failed", err, { file: "outbox.json" });
     return [];
   }
 }
@@ -81,7 +82,7 @@ function readAgentTraces(): AgentTraceRecord[] {
     const raw = fs.readFileSync(agentTraceFile, "utf8");
     return JSON.parse(raw) as AgentTraceRecord[];
   } catch (err) {
-    console.error("Error leyendo agent traces JSON:", err);
+    logger.error("json_storage_read_failed", err, { file: "agent_traces.json" });
     return [];
   }
 }

@@ -10,6 +10,7 @@ import {
 } from "./observability/metrics";
 import { probeRuntimeHealth } from "./observability/runtimeHealth";
 import { createRequestId, logger } from "./observability/logger";
+import { buildOperationalDiagnostics } from "./observability/diagnostics";
 import {
   getAdminApiToken,
   getCorsConfig,
@@ -25,6 +26,7 @@ type RateLimitEntry = {
 function isProtectedOperationalPath(path: string) {
   return (
     path === "/metrics" ||
+    path === "/diagnostics" ||
     path.startsWith("/api/telemetry/admin/") ||
     path.startsWith("/api/agent/admin/") ||
     /^\/api\/agent\/conversations\/[^/]+\/traces$/.test(path)
@@ -150,6 +152,19 @@ export function createApp() {
 
   app.get("/metrics", async (_req, res) => {
     res.json(snapshotMetrics());
+  });
+
+  app.get("/diagnostics", async (_req, res) => {
+    const runtimeHealth = await probeRuntimeHealth();
+    res.json(
+      buildOperationalDiagnostics({
+        role: "api",
+        runtimeHealth,
+        extras: {
+          outboxWorker: process.env.OUTBOX_WORKER_URL ? "http" : "memory",
+        },
+      })
+    );
   });
 
   return app;

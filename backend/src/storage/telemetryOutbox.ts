@@ -5,6 +5,7 @@ import type {
   TelemetryOutboxDeadLetterPruneOptions,
   TelemetryOutboxRecord,
 } from "./outboxTypes";
+import { logger } from "../observability/logger";
 import { usePostgresStorage } from "./storageMode";
 
 function isStorageFailure(err: unknown) {
@@ -22,7 +23,12 @@ export async function saveEventsWithOutbox(events: TelemetryEvent[]) {
     if (!isStorageFailure(err)) {
       throw err;
     }
-    console.warn("Postgres unavailable, falling back to JSON storage with outbox:", err);
+    logger.warn("postgres_fallback_to_json", {
+      component: "telemetry_outbox",
+      operation: "save_events_with_outbox",
+      eventCount: events.length,
+      error: logger.serializeError(err),
+    });
     const result = db.saveEventsWithOutbox(events);
     return {
       ...result,
@@ -42,7 +48,12 @@ export async function claimPendingOutbox(
   try {
     return await pg.claimPendingOutbox(limit, lockTimeoutMs);
   } catch (err) {
-    console.warn("Postgres unavailable, claiming outbox from JSON storage:", err);
+    logger.warn("postgres_fallback_to_json", {
+      component: "telemetry_outbox",
+      operation: "claim_pending",
+      limit,
+      error: logger.serializeError(err),
+    });
     return db.claimPendingOutbox(limit, lockTimeoutMs);
   }
 }
@@ -57,7 +68,12 @@ export async function markOutboxPublished(ids: string[]) {
   try {
     await pg.markOutboxPublished(ids);
   } catch (err) {
-    console.warn("Postgres unavailable, marking JSON outbox as published:", err);
+    logger.warn("postgres_fallback_to_json", {
+      component: "telemetry_outbox",
+      operation: "mark_published",
+      count: ids.length,
+      error: logger.serializeError(err),
+    });
     db.markOutboxPublished(ids);
   }
 }
@@ -70,7 +86,12 @@ export async function markOutboxRetry(record: TelemetryOutboxRecord, error: stri
   try {
     await pg.markOutboxRetry(record.id, error, delayMs, record.attempts, record.maxAttempts);
   } catch (err) {
-    console.warn("Postgres unavailable, rescheduling JSON outbox:", err);
+    logger.warn("postgres_fallback_to_json", {
+      component: "telemetry_outbox",
+      operation: "mark_retry",
+      outboxId: record.id,
+      error: logger.serializeError(err),
+    });
     db.markOutboxRetry(record.id, error, delayMs, record.attempts, record.maxAttempts);
   }
 }
@@ -83,7 +104,12 @@ export async function markOutboxDead(record: TelemetryOutboxRecord, error: strin
   try {
     await pg.markOutboxDead(record.id, error, record.attempts);
   } catch (err) {
-    console.warn("Postgres unavailable, marking JSON outbox dead:", err);
+    logger.warn("postgres_fallback_to_json", {
+      component: "telemetry_outbox",
+      operation: "mark_dead",
+      outboxId: record.id,
+      error: logger.serializeError(err),
+    });
     db.markOutboxDead(record.id, error, record.attempts);
   }
 }
@@ -96,7 +122,11 @@ export async function getOutboxSummary() {
   try {
     return await pg.getOutboxSummary();
   } catch (err) {
-    console.warn("Postgres unavailable, summarizing JSON outbox:", err);
+    logger.warn("postgres_fallback_to_json", {
+      component: "telemetry_outbox",
+      operation: "get_summary",
+      error: logger.serializeError(err),
+    });
     return db.getOutboxSummary("json_fallback");
   }
 }
@@ -109,7 +139,13 @@ export async function pruneDeadOutboxLetters(options: TelemetryOutboxDeadLetterP
   try {
     return await pg.pruneDeadOutboxLetters(options);
   } catch (err) {
-    console.warn("Postgres unavailable, pruning JSON outbox dead letters:", err);
+    logger.warn("postgres_fallback_to_json", {
+      component: "telemetry_outbox",
+      operation: "prune_dead_letters",
+      olderThanDays: options.olderThanDays,
+      dryRun: options.dryRun,
+      error: logger.serializeError(err),
+    });
     return db.pruneDeadOutboxLetters(options, "json_fallback");
   }
 }

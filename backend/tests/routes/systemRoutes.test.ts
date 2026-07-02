@@ -1,6 +1,7 @@
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../src/app";
+import { logger } from "../../src/observability/logger";
 
 const originalAdminToken = process.env.ADMIN_API_TOKEN;
 const originalCorsOrigins = process.env.CORS_ALLOWED_ORIGINS;
@@ -33,6 +34,7 @@ afterEach(() => {
   }
 
   vi.restoreAllMocks();
+  logger.clearRecentProblems();
 });
 
 describe("system routes", () => {
@@ -66,6 +68,36 @@ describe("system routes", () => {
     expect(res.body).toMatchObject({
       counters: expect.any(Object),
       timings: expect.any(Object),
+    });
+  });
+
+  it("returns protected operational diagnostics", async () => {
+    process.env.ADMIN_API_TOKEN = "secret-token";
+    logger.warn("diagnostic_test_warning", { requestId: "req-test" });
+
+    const rejected = await request(createApp()).get("/diagnostics");
+    const accepted = await request(createApp())
+      .get("/diagnostics")
+      .set("X-Admin-Token", "secret-token");
+
+    expect(rejected.status).toBe(401);
+    expect(rejected.body).toEqual({ error: "admin_auth_required" });
+    expect(accepted.status).toBe(200);
+    expect(accepted.body).toMatchObject({
+      status: expect.any(String),
+      attentionRequired: true,
+      role: "api",
+      runtime: expect.any(Object),
+      metrics: expect.any(Object),
+      signals: {
+        errorCounters: expect.any(Object),
+        recentProblems: expect.arrayContaining([
+          expect.objectContaining({
+            level: "warn",
+            message: "diagnostic_test_warning",
+          }),
+        ]),
+      },
     });
   });
 

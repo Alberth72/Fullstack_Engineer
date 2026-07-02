@@ -7,6 +7,7 @@ import { getTelemetryOutboxWorkerConfig } from "./events/outboxWorkerConfig";
 import { incrementCounter, recordTiming, snapshotMetrics } from "./observability/metrics";
 import { probeRuntimeHealth } from "./observability/runtimeHealth";
 import { createRequestId, logger } from "./observability/logger";
+import { buildOperationalDiagnostics } from "./observability/diagnostics";
 import { getAdminApiToken } from "./security/securityConfig";
 
 function readAdminToken(req: express.Request) {
@@ -64,6 +65,24 @@ export function createWorkerApp() {
       metrics: snapshotMetrics(),
       timestamp: runtimeHealth.timestamp,
     });
+  });
+
+  app.get("/diagnostics", async (req, res) => {
+    const requiredToken = getAdminApiToken();
+    if (requiredToken && readAdminToken(req) !== requiredToken) {
+      return res.status(401).json({ error: "admin_auth_required" });
+    }
+
+    const runtimeHealth = await probeRuntimeHealth();
+    res.json(
+      buildOperationalDiagnostics({
+        role: "outbox-worker",
+        runtimeHealth,
+        extras: {
+          outboxWorker: getTelemetryOutboxWorkerConfig(),
+        },
+      })
+    );
   });
 
   app.post("/internal/outbox/notify", async (req, res) => {

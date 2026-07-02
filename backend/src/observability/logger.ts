@@ -1,6 +1,19 @@
 type LogLevel = "info" | "warn" | "error";
 
 type LogContext = Record<string, unknown>;
+type LogEvent = {
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+  context: LogContext;
+};
+
+const recentProblemLogs: LogEvent[] = [];
+
+function getRecentProblemLogLimit() {
+  const parsed = Number.parseInt(process.env.RECENT_LOG_BUFFER_SIZE || "50", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 50;
+}
 
 export function createRequestId(prefix = "req") {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -27,6 +40,20 @@ function write(level: LogLevel, message: string, context: LogContext = {}) {
     message,
     ...context,
   };
+
+  if (level === "warn" || level === "error") {
+    recentProblemLogs.push({
+      timestamp: payload.timestamp,
+      level,
+      message,
+      context,
+    });
+
+    const limit = getRecentProblemLogLimit();
+    if (recentProblemLogs.length > limit) {
+      recentProblemLogs.splice(0, recentProblemLogs.length - limit);
+    }
+  }
 
   const serialized = JSON.stringify(payload);
   if (level === "error") {
@@ -56,4 +83,10 @@ export const logger = {
     });
   },
   serializeError,
+  recentProblems(limit = 10) {
+    return recentProblemLogs.slice(-limit).reverse();
+  },
+  clearRecentProblems() {
+    recentProblemLogs.length = 0;
+  },
 };

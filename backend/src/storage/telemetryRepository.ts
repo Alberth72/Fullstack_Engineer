@@ -1,6 +1,7 @@
 import * as db from "./db_json";
 import * as pg from "./pg";
 import type { TelemetryRepositoryPort } from "../application/telemetry/ports";
+import { logger } from "../observability/logger";
 import { usePostgresStorage } from "./storageMode";
 
 export const telemetryRepository: TelemetryRepositoryPort = {
@@ -17,7 +18,12 @@ export const telemetryRepository: TelemetryRepositoryPort = {
     try {
       return await pg.saveEventsWithOutbox(events);
     } catch (err) {
-      console.warn("Postgres unavailable, falling back to JSON storage with outbox:", err);
+      logger.warn("postgres_fallback_to_json", {
+        component: "telemetry_repository",
+        operation: "save_events_with_outbox",
+        eventCount: events.length,
+        error: logger.serializeError(err),
+      });
       const result = db.saveEventsWithOutbox(events);
       return {
         ...result,
@@ -33,7 +39,11 @@ export const telemetryRepository: TelemetryRepositoryPort = {
     try {
       return await pg.getFleetState();
     } catch (err) {
-      console.warn("Postgres unavailable, falling back to JSON storage:", err);
+      logger.warn("postgres_fallback_to_json", {
+        component: "telemetry_repository",
+        operation: "get_fleet_state",
+        error: logger.serializeError(err),
+      });
       return db.getFleetState();
     }
   },
@@ -45,7 +55,12 @@ export const telemetryRepository: TelemetryRepositoryPort = {
     try {
       return await pg.getEventsForVehicle(vehicleId, limit);
     } catch (err) {
-      console.warn("Postgres unavailable, falling back to JSON storage:", err);
+      logger.warn("postgres_fallback_to_json", {
+        component: "telemetry_repository",
+        operation: "get_vehicle_events",
+        vehicleId,
+        error: logger.serializeError(err),
+      });
       return db.getEventsForVehicle(vehicleId, limit);
     }
   },
@@ -57,7 +72,13 @@ export const telemetryRepository: TelemetryRepositoryPort = {
     try {
       return await pg.getFastestVehicles(minSpeed, limit);
     } catch (err) {
-      console.warn("Postgres unavailable, falling back to JSON speed leaderboard:", err);
+      logger.warn("postgres_fallback_to_json", {
+        component: "telemetry_repository",
+        operation: "get_fastest_vehicles",
+        minSpeed,
+        limit,
+        error: logger.serializeError(err),
+      });
       return db.getFastestVehicles(minSpeed, limit);
     }
   },
@@ -69,7 +90,11 @@ export const telemetryRepository: TelemetryRepositoryPort = {
     try {
       return await pg.getTelemetryStats();
     } catch (err) {
-      console.warn("Postgres unavailable, falling back to JSON-derived stats:", err);
+      logger.warn("postgres_fallback_to_json", {
+        component: "telemetry_repository",
+        operation: "get_telemetry_stats",
+        error: logger.serializeError(err),
+      });
       return db.getTelemetryStats();
     }
   },

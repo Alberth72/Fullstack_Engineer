@@ -36,6 +36,7 @@ El arranque full ahora espera salud real de Postgres y RabbitMQ antes de levanta
 | API backend | http://localhost:4001 |
 | Health backend | http://localhost:4001/health |
 | Metrics backend | http://localhost:4001/metrics |
+| Diagnostics backend | http://localhost:4001/diagnostics |
 | API telemetry | http://localhost:4001/api/telemetry/state |
 | Chat IA | http://localhost:4001/api/agent/query |
 | Worker health | http://localhost:4002/health |
@@ -51,10 +52,27 @@ Credenciales locales por defecto:
 ## Flujo de prueba sugerido
 1. Abre el frontend y verifica que cargue el dashboard.
 2. Abre el endpoint de health del backend.
-3. Consulta `GET /api/telemetry/state` para ver la flota.
-4. Envia un evento o lote de telemetria para observar el outbox y la publicacion.
-5. Usa el chat IA con `conversationId` repetido para validar el modo multi-turn.
-6. Abre RabbitMQ Management y confirma colas y mensajes.
+3. Consulta `/diagnostics` con token admin si esta configurado para ver health, metricas y problemas recientes.
+4. Consulta `GET /api/telemetry/state` para ver la flota.
+5. Envia un evento o lote de telemetria para observar el outbox y la publicacion.
+6. Usa el chat IA con `conversationId` repetido para validar el modo multi-turn.
+7. Abre RabbitMQ Management y confirma colas y mensajes.
+
+## Diagnostico operacional
+`GET /diagnostics` resume health, metricas, contadores de error y ultimos logs `warn`/`error` del proceso. Si `ADMIN_API_TOKEN` esta configurado, requiere `Authorization: Bearer <token>` o `X-Admin-Token`.
+
+```bash
+curl http://localhost:4001/diagnostics
+```
+
+Con token:
+
+```bash
+curl http://localhost:4001/diagnostics -H "X-Admin-Token: <token>"
+```
+
+El worker tambien expone `GET /diagnostics` en `http://localhost:4002/diagnostics` cuando corre el modo full.
+Los logs del backend, worker, simulador y fallback JSON salen como JSON estructurado a stdout/stderr. Los `warn` y `error` recientes quedan visibles en `/diagnostics`.
 
 ## Operacion del outbox
 Consulta el estado operativo del outbox:
