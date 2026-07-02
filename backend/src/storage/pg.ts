@@ -4,6 +4,8 @@ import { FleetVehicleState, TelemetryEvent } from "../types/telemetry";
 import { CircuitBreaker, withRetry } from "../utils/resilience";
 import type {
   TelemetryOutboxRecord,
+  TelemetryOutboxDeadLetterPruneOptions,
+  TelemetryOutboxDeadLetterPruneResult,
   TelemetryOutboxStatus,
   TelemetryOutboxSummary,
 } from "./outboxTypes";
@@ -689,6 +691,58 @@ export async function getOutboxSummary(): Promise<TelemetryOutboxSummary> {
         nextAttemptAt: Number(entry.next_attempt_at_ms),
         lastError: entry.last_error,
       })),
+    };
+  });
+}
+
+export async function pruneDeadOutboxLetters(
+  options: TelemetryOutboxDeadLetterPruneOptions
+): Promise<TelemetryOutboxDeadLetterPruneResult> {
+  return executeDb(async () => {
+    await ensureSchema();
+    const generatedAt = options.now ?? Date.now();
+    const cutoffAt = generatedAt - options.olderThanDays * 24 * 60 * 60 * 1000;
+    const cutoff = new Date(cutoffAt);
+    const matchedResult = await pool.query<{ count: string }>(
+      `
+      SELECT COUNT(*)::text AS count
+      FROM telemetry_outbox
+      WHERE status = 'dead'
+        AND next_attempt_at <= $1
+      `,
+      [cutoff]
+    );
+    const matched = Number(matchedResult.rows[0]?.count ?? 0);
+    let deleted = 0;
+
+    if (!options.dryRun && matched > 0) {
+      const deletedResult = await pool.query(
+        `
+        DELETE FROM telemetry_outbox
+        WHERE status = 'dead'
+          AND next_attempt_at <= $1
+        `,
+        [cutoff]
+      );
+      deleted = deletedResult.rowCount ?? 0;
+    }
+
+    const retainedResult = await pool.query<{ count: string }>(
+      `
+      SELECT COUNT(*)::text AS count
+      FROM telemetry_outbox
+      `
+    );
+
+    return {
+      generatedAt,
+      storage: "postgres",
+      dryRun: options.dryRun,
+      olderThanDays: options.olderThanDays,
+      cutoffAt,
+      matched,
+      deleted,
+      retained: Number(retainedResult.rows[0]?.count ?? 0),
     };
   });
 }

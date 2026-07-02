@@ -4,6 +4,8 @@ import { FleetVehicleState, TelemetryEvent } from "../types/telemetry";
 import type { AgentTraceRecord } from "./agentAuditTypes";
 import type {
   TelemetryOutboxRecord,
+  TelemetryOutboxDeadLetterPruneOptions,
+  TelemetryOutboxDeadLetterPruneResult,
   TelemetryOutboxStatus,
   TelemetryOutboxStorageMode,
   TelemetryOutboxSummary,
@@ -421,6 +423,34 @@ export function getOutboxSummary(
     retryCount: byStatus.retry,
     processingCount: byStatus.processing,
     errorSamples,
+  };
+}
+
+export function pruneDeadOutboxLetters(
+  options: TelemetryOutboxDeadLetterPruneOptions,
+  storage: TelemetryOutboxStorageMode = "json"
+): TelemetryOutboxDeadLetterPruneResult {
+  const generatedAt = options.now ?? Date.now();
+  const cutoffAt = generatedAt - options.olderThanDays * 24 * 60 * 60 * 1000;
+  const outbox = readOutbox();
+  const matches = outbox.filter(
+    (entry) => entry.status === "dead" && entry.nextAttemptAt <= cutoffAt
+  );
+
+  if (!options.dryRun && matches.length > 0) {
+    const matchedIds = new Set(matches.map((entry) => entry.id));
+    writeOutbox(outbox.filter((entry) => !matchedIds.has(entry.id)));
+  }
+
+  return {
+    generatedAt,
+    storage,
+    dryRun: options.dryRun,
+    olderThanDays: options.olderThanDays,
+    cutoffAt,
+    matched: matches.length,
+    deleted: options.dryRun ? 0 : matches.length,
+    retained: outbox.length - (options.dryRun ? 0 : matches.length),
   };
 }
 

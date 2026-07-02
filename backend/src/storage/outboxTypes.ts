@@ -46,3 +46,20 @@ export type TelemetryOutboxSummary = {
   processingCount: number;
   errorSamples: TelemetryOutboxErrorSample[];
 };
+
+export type TelemetryOutboxDeadLetterPruneOptions = {
+  olderThanDays: number;
+  dryRun: boolean;
+  now?: number;
+};
+
+export type TelemetryOutboxDeadLetterPruneResult = {
+  generatedAt: number;
+  storage: TelemetryOutboxStorageMode;
+  dryRun: boolean;
+  olderThanDays: number;
+  cutoffAt: number;
+  matched: number;
+  deleted: number;
+  retained: number;
+};

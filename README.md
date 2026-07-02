@@ -115,6 +115,7 @@ npm run dev
 | `GET` | `/api/telemetry/critical-zones/stopped` | Ver vehiculos detenidos en zonas criticas |
 | `GET` | `/api/telemetry/admin/outbox` | Ver backlog, retries y dead letters del outbox |
 | `GET` | `/api/telemetry/admin/outbox/config` | Ver configuracion efectiva del worker de outbox |
+| `POST` | `/api/telemetry/admin/outbox/dead-letters/prune` | Simular o ejecutar limpieza de dead letters historicos del outbox |
 | `GET` | `/api/telemetry/admin/ingestion` | Ver eventos recibidos, nuevos, actualizados y duplicados |
 | `GET` | `/api/telemetry/admin/retention` | Ver retencion Timescale y compactacion JSON efectivas |
 | `POST` | `/api/agent/query` | Consultar al agente IA y obtener una respuesta natural |

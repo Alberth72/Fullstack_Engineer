@@ -4,6 +4,7 @@ import { incrementCounter, snapshotMetrics } from "../observability/metrics";
 import { logger } from "../observability/logger";
 
 const router = Router();
+const DEFAULT_DEAD_LETTER_PRUNE_DAYS = 14;
 
 function isValidationError(err: unknown) {
   return (
@@ -141,6 +142,42 @@ router.get("/admin/outbox/config", async (req, res) => {
   } catch (err) {
     incrementCounter("telemetryErrors");
     logger.error("telemetry_outbox_config_failed", err, {
+      requestId: req.header("x-request-id") || null,
+    });
+    res.status(500).json({ error: "internal_error" });
+  }
+});
+
+function parseDeadLetterPruneBody(body: unknown) {
+  const payload = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const olderThanDays =
+    payload.olderThanDays === undefined
+      ? DEFAULT_DEAD_LETTER_PRUNE_DAYS
+      : Number(payload.olderThanDays);
+  const dryRun = payload.dryRun === false ? false : true;
+
+  if (!Number.isFinite(olderThanDays) || olderThanDays <= 0) {
+    throw new Error("invalid_older_than_days");
+  }
+
+  return {
+    olderThanDays,
+    dryRun,
+  };
+}
+
+router.post("/admin/outbox/dead-letters/prune", async (req, res) => {
+  try {
+    const options = parseDeadLetterPruneBody(req.body);
+    const result = await telemetryService.pruneTelemetryOutboxDeadLetters(options);
+    res.json(result);
+  } catch (err) {
+    if (err instanceof Error && err.message === "invalid_older_than_days") {
+      return res.status(400).json({ error: "invalid_older_than_days" });
+    }
+
+    incrementCounter("telemetryErrors");
+    logger.error("telemetry_outbox_dead_letter_prune_failed", err, {
       requestId: req.header("x-request-id") || null,
     });
     res.status(500).json({ error: "internal_error" });

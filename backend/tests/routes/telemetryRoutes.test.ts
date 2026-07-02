@@ -13,6 +13,7 @@ vi.mock("../../src/services/telemetryService", () => ({
   getVehiclesInCriticalZones: vi.fn(),
   getStoppedVehiclesInCriticalZones: vi.fn(),
   getTelemetryOutboxSummary: vi.fn(),
+  pruneTelemetryOutboxDeadLetters: vi.fn(),
   getTelemetryOutboxWorkerEffectiveConfig: vi.fn(),
   getTelemetryRetentionEffectivePolicy: vi.fn(),
 }));
@@ -313,6 +314,74 @@ describe("telemetry routes", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ worker: config });
+  });
+
+  it("dry-runs telemetry dead letter pruning by default", async () => {
+    const result = {
+      generatedAt: 1700000000000,
+      storage: "json",
+      dryRun: true,
+      olderThanDays: 14,
+      cutoffAt: 1698790400000,
+      matched: 2,
+      deleted: 0,
+      retained: 5,
+    };
+
+    mockedTelemetryService.pruneTelemetryOutboxDeadLetters.mockResolvedValue(result as never);
+
+    const res = await request(createApp())
+      .post("/api/telemetry/admin/outbox/dead-letters/prune")
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(mockedTelemetryService.pruneTelemetryOutboxDeadLetters).toHaveBeenCalledWith({
+      olderThanDays: 14,
+      dryRun: true,
+    });
+    expect(res.body).toEqual(result);
+  });
+
+  it("allows explicit telemetry dead letter pruning with admin token", async () => {
+    process.env.ADMIN_API_TOKEN = "secret-token";
+    const result = {
+      generatedAt: 1700000000000,
+      storage: "postgres",
+      dryRun: false,
+      olderThanDays: 30,
+      cutoffAt: 1697408000000,
+      matched: 3,
+      deleted: 3,
+      retained: 10,
+    };
+
+    mockedTelemetryService.pruneTelemetryOutboxDeadLetters.mockResolvedValue(result as never);
+
+    const rejected = await request(createApp())
+      .post("/api/telemetry/admin/outbox/dead-letters/prune")
+      .send({ olderThanDays: 30, dryRun: false });
+    const accepted = await request(createApp())
+      .post("/api/telemetry/admin/outbox/dead-letters/prune")
+      .set("X-Admin-Token", "secret-token")
+      .send({ olderThanDays: 30, dryRun: false });
+
+    expect(rejected.status).toBe(401);
+    expect(accepted.status).toBe(200);
+    expect(mockedTelemetryService.pruneTelemetryOutboxDeadLetters).toHaveBeenCalledWith({
+      olderThanDays: 30,
+      dryRun: false,
+    });
+    expect(accepted.body).toEqual(result);
+  });
+
+  it("rejects invalid telemetry dead letter prune windows", async () => {
+    const res = await request(createApp())
+      .post("/api/telemetry/admin/outbox/dead-letters/prune")
+      .send({ olderThanDays: 0 });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "invalid_older_than_days" });
+    expect(mockedTelemetryService.pruneTelemetryOutboxDeadLetters).not.toHaveBeenCalled();
   });
 
   it("returns the telemetry ingestion admin counters", async () => {

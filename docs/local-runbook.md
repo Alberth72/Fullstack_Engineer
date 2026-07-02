@@ -56,6 +56,30 @@ Credenciales locales por defecto:
 5. Usa el chat IA con `conversationId` repetido para validar el modo multi-turn.
 6. Abre RabbitMQ Management y confirma colas y mensajes.
 
+## Operacion del outbox
+Consulta el estado operativo del outbox:
+
+```bash
+curl http://localhost:4001/api/telemetry/admin/outbox
+```
+
+Simula la limpieza de dead letters historicos. Este modo no elimina registros:
+
+```bash
+curl -X POST http://localhost:4001/api/telemetry/admin/outbox/dead-letters/prune \
+  -H "Content-Type: application/json" \
+  -d "{\"olderThanDays\":14}"
+```
+
+Para ejecutar la limpieza real, envia `dryRun: false`. Si `ADMIN_API_TOKEN` esta configurado, agrega `X-Admin-Token`.
+
+```bash
+curl -X POST http://localhost:4001/api/telemetry/admin/outbox/dead-letters/prune \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Token: <token>" \
+  -d "{\"olderThanDays\":14,\"dryRun\":false}"
+```
+
 ## Nota de ligereza
 Si notas el proyecto pesado en memoria, primero deja apagado el simulador y el worker. En modo liviano no se levantan y el portal sigue funcionando con los datos persistidos en `backend/data/events.json`.
 

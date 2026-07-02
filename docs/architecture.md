@@ -150,6 +150,7 @@ El backend expone vistas derivadas en lugar de obligar al frontend a reconstruir
 - `GET /api/telemetry/critical-zones/stopped?minMinutes=20`
 - `GET /api/telemetry/admin/outbox`
 - `GET /api/telemetry/admin/outbox/config`
+- `POST /api/telemetry/admin/outbox/dead-letters/prune`
 - `GET /api/telemetry/admin/ingestion`
 - `GET /api/telemetry/admin/retention`
 
@@ -176,6 +177,7 @@ El backend expone vistas derivadas en lugar de obligar al frontend a reconstruir
 - `GET /metrics` expone contadores y tiempos promedio de respuesta.
 - `GET /api/telemetry/admin/outbox` expone backlog, retries, bloqueos por backoff y dead letters del outbox sin requerir acceso directo a storage.
 - `GET /api/telemetry/admin/outbox/config` expone intervalo de polling, limite de claim, lock timeout y politicas efectivas de retry/backoff del worker.
+- `POST /api/telemetry/admin/outbox/dead-letters/prune` permite simular por defecto o ejecutar explicitamente la limpieza de dead letters historicos por ventana de antiguedad.
 - `GET /api/telemetry/admin/ingestion` expone eventos recibidos, unicos aceptados, insertados, actualizados por idempotencia, duplicados de batch y entradas de outbox creadas o saltadas.
 - `GET /api/telemetry/admin/retention` expone la politica efectiva de retencion Timescale y compactacion JSON.
 - Cada request recibe `x-request-id`.

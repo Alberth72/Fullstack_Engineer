@@ -1,7 +1,10 @@
 import * as db from "./db_json";
 import * as pg from "./pg";
 import type { TelemetryEvent } from "../types/telemetry";
-import type { TelemetryOutboxRecord } from "./outboxTypes";
+import type {
+  TelemetryOutboxDeadLetterPruneOptions,
+  TelemetryOutboxRecord,
+} from "./outboxTypes";
 import { usePostgresStorage } from "./storageMode";
 
 function isStorageFailure(err: unknown) {
@@ -95,5 +98,18 @@ export async function getOutboxSummary() {
   } catch (err) {
     console.warn("Postgres unavailable, summarizing JSON outbox:", err);
     return db.getOutboxSummary("json_fallback");
+  }
+}
+
+export async function pruneDeadOutboxLetters(options: TelemetryOutboxDeadLetterPruneOptions) {
+  if (!usePostgresStorage) {
+    return db.pruneDeadOutboxLetters(options, "json");
+  }
+
+  try {
+    return await pg.pruneDeadOutboxLetters(options);
+  } catch (err) {
+    console.warn("Postgres unavailable, pruning JSON outbox dead letters:", err);
+    return db.pruneDeadOutboxLetters(options, "json_fallback");
   }
 }
