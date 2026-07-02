@@ -29,6 +29,7 @@ MVP para monitoreo de flotas con ingesta de telemetria, agente IA, dashboard ope
 - `GET /api/telemetry/critical-zones/stopped` expone alertas operativas.
 - `POST /api/agent/query` clasifica la intencion primero, responde por reglas los conteos simples y usa LangChain solo para consultas mas complejas; devuelve `reply` en lenguaje natural y `conversationId` sigue siendo interno.
 - Un worker independiente publica el outbox en RabbitMQ y el WebSocket `/ws` empuja los eventos al frontend.
+- La migracion formal de TimescaleDB vive en `backend/migrations/001_timescale_hypertable_event_ids.sql` y separa idempotencia (`telemetry_event_ingest_ids`) de serie temporal (`telemetry_events` como hypertable).
 
 ## Como correr en local
 
@@ -118,6 +119,7 @@ npm run dev
 | `POST` | `/api/telemetry/admin/outbox/dead-letters/prune` | Simular o ejecutar limpieza de dead letters historicos del outbox |
 | `GET` | `/api/telemetry/admin/ingestion` | Ver eventos recibidos, nuevos, actualizados y duplicados |
 | `GET` | `/api/telemetry/admin/retention` | Ver retencion Timescale y compactacion JSON efectivas |
+| `GET` | `/api/telemetry/admin/storage/readiness` | Ver readiness de TimescaleDB, hypertable y bloqueadores de migracion |
 | `POST` | `/api/agent/query` | Consultar al agente IA y obtener una respuesta natural |
 | `GET` | `/api/agent/conversations/:conversationId/traces` | Consultar trazas auditables de una conversacion IA |
 | `GET` | `/api/agent/admin/config` | Ver configuracion efectiva de auditoria IA |

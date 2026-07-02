@@ -212,6 +212,19 @@ router.get("/admin/retention", (_req, res) => {
   }
 });
 
+router.get("/admin/storage/readiness", async (req, res) => {
+  try {
+    const readiness = await telemetryService.getTelemetryStorageReadiness();
+    res.json(readiness);
+  } catch (err) {
+    incrementCounter("telemetryErrors");
+    logger.error("telemetry_storage_readiness_failed", err, {
+      requestId: req.header("x-request-id") || null,
+    });
+    res.status(500).json({ error: "internal_error" });
+  }
+});
+
 router.get("/vehicle/:id/events", async (req, res) => {
   try {
     const vehicleId = req.params.id;

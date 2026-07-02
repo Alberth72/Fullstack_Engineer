@@ -215,14 +215,16 @@ Si el presupuesto no alcanza, el agente debe cerrar con bloqueo explicito o prop
 
 | Tipo de cambio | Verificacion minima |
 | --- | --- |
-| Backend | `cd backend && npm test` o test focal si aplica |
-| Backend build | `cd backend && npm run build` si existe script |
-| Frontend | `cd frontend && npm test && npm run build` |
-| Mobile | `cd mobile && npm run typecheck && npm test` |
+| Backend | `cd backend && npm.cmd test` o test focal si aplica |
+| Backend build | `cd backend && npm.cmd run build` si existe script |
+| Frontend | `cd frontend && npm.cmd test && npm.cmd run build` |
+| Mobile | `cd mobile && npm.cmd run typecheck && npm.cmd test` |
 | Infra Compose | `cd infra && docker compose config` o `docker compose up --build` segun alcance |
-| Integracion real | `cd backend && npm run test:integration` |
+| Integracion real | `cd backend && npm.cmd run test:integration` |
 | AI agent | tests de agent, trazas auditables y no invencion de datos |
 | Docs | revision de links, consistencia con README/arquitectura |
+
+En este workspace Windows con PowerShell, usar `npm.cmd` para comandos Node. `npm` puede resolver a `npm.ps1` y fallar por politica de ejecucion aunque el proyecto este correcto.
 
 Si un comando no se puede ejecutar, registrar:
 - comando intentado
@@ -321,4 +323,3 @@ Revertir cambios del panel de alertas sin alterar contratos backend.
 Documento a actualizar:
 docs/local-runbook.md si cambia el flujo de validacion.
 ```
-

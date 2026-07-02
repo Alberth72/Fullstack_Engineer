@@ -16,6 +16,7 @@ vi.mock("../../src/services/telemetryService", () => ({
   pruneTelemetryOutboxDeadLetters: vi.fn(),
   getTelemetryOutboxWorkerEffectiveConfig: vi.fn(),
   getTelemetryRetentionEffectivePolicy: vi.fn(),
+  getTelemetryStorageReadiness: vi.fn(),
 }));
 
 import { createApp } from "../../src/app";
@@ -442,6 +443,45 @@ describe("telemetry routes", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual(policy);
+  });
+
+  it("returns telemetry storage readiness for Timescale migration checks", async () => {
+    const readiness = {
+      generatedAt: 1700000000000,
+      activeStorage: "postgres",
+      postgres: {
+        configured: true,
+        connected: true,
+        tableExists: true,
+        timescaleExtensionInstalled: true,
+        hypertable: {
+          expected: true,
+          active: false,
+          table: "telemetry_events",
+          timeColumn: "timestamp",
+          mode: "best_effort_on_schema_init",
+        },
+        idempotencyTableExists: true,
+        primaryKeyColumns: ["id"],
+        migrationBlockers: [
+          "primary_key_without_time_column",
+          "telemetry_events_not_hypertable",
+        ],
+      },
+      fallback: {
+        jsonAvailable: true,
+        reason: null,
+      },
+      recommendation:
+        "Review migrationBlockers before relying on TimescaleDB retention and hypertable behavior in production.",
+    };
+
+    mockedTelemetryService.getTelemetryStorageReadiness.mockResolvedValue(readiness as never);
+
+    const res = await request(createApp()).get("/api/telemetry/admin/storage/readiness");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(readiness);
   });
 
   it("returns vehicle detail when the vehicle exists", async () => {

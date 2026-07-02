@@ -5,6 +5,7 @@ import {
   getPostgresTelemetryRetentionDays,
   getTelemetryRetentionPolicy,
 } from "../../src/storage/telemetryRetentionPolicy";
+import { getJsonTelemetrySchemaReadiness } from "../../src/storage/telemetrySchemaReadiness";
 
 const originalRetentionDays = process.env.TELEMETRY_RETENTION_DAYS;
 const originalJsonMaxEvents = process.env.JSON_STORAGE_MAX_EVENTS_PER_VEHICLE;
@@ -51,6 +52,32 @@ describe("telemetry retention policy", () => {
           maxEventsPerVehicle: 500,
           envVar: "JSON_STORAGE_MAX_EVENTS_PER_VEHICLE",
         },
+      },
+    });
+  });
+
+  it("exposes JSON fallback storage readiness when Postgres is not configured", () => {
+    const readiness = getJsonTelemetrySchemaReadiness("json");
+
+    expect(readiness).toMatchObject({
+      activeStorage: "json",
+      postgres: {
+        configured: false,
+        connected: false,
+        tableExists: false,
+        timescaleExtensionInstalled: false,
+        hypertable: {
+          expected: false,
+          active: false,
+          table: "telemetry_events",
+          timeColumn: "timestamp",
+        },
+        idempotencyTableExists: false,
+        migrationBlockers: [],
+      },
+      fallback: {
+        jsonAvailable: true,
+        reason: null,
       },
     });
   });

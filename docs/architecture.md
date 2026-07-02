@@ -93,7 +93,7 @@ flowchart TB
 ## Flujo de telemetria
 1. Un dispositivo o el simulador llama `POST /api/telemetry/event` o `POST /api/telemetry/events/batch`.
 2. `application/telemetry` valida y normaliza el payload antes de persistirlo.
-3. `telemetryRepository` guarda en TimescaleDB y registra la entrada equivalente en el outbox persistente.
+3. `telemetryRepository` guarda en TimescaleDB usando `telemetry_events` como serie temporal y `telemetry_event_ingest_ids` como control de idempotencia por `id`.
 4. El API notifica al worker por HTTP con circuit breaker; si falla, el outbox sigue garantizando durabilidad.
 5. El worker independiente reclama entradas pendientes y publica el mensaje en RabbitMQ con reintentos y backoff.
 6. `registerTelemetryConsumers()` difunde el evento al WebSocket `/ws` desde un consumidor dedicado.
@@ -110,6 +110,9 @@ flowchart TB
 ### Puntos tecnicos actualizados
 - La persistencia primaria usa `backend/src/storage/pg.ts`.
 - El fallback local vive en `backend/src/storage/db_json.ts`.
+- La migracion formal de TimescaleDB vive en `backend/migrations/001_timescale_hypertable_event_ids.sql`.
+- `telemetry_events` usa primary key `(id, timestamp)` para cumplir reglas de unique index de TimescaleDB.
+- `telemetry_event_ingest_ids` conserva idempotencia por `id` sin bloquear el hypertable.
 - El outbox persistente vive en `backend/src/storage/telemetryOutbox.ts`.
 - El notificador HTTP vive en `backend/src/events/outboxNotifier.ts`.
 - El worker de reintentos vive en `backend/src/events/outboxWorker.ts`.
@@ -153,6 +156,7 @@ El backend expone vistas derivadas en lugar de obligar al frontend a reconstruir
 - `POST /api/telemetry/admin/outbox/dead-letters/prune`
 - `GET /api/telemetry/admin/ingestion`
 - `GET /api/telemetry/admin/retention`
+- `GET /api/telemetry/admin/storage/readiness`
 
 ## Flujo del agente IA
 1. El frontend envia una pregunta a `POST /api/agent/query`.
@@ -180,6 +184,7 @@ El backend expone vistas derivadas en lugar de obligar al frontend a reconstruir
 - `POST /api/telemetry/admin/outbox/dead-letters/prune` permite simular por defecto o ejecutar explicitamente la limpieza de dead letters historicos por ventana de antiguedad.
 - `GET /api/telemetry/admin/ingestion` expone eventos recibidos, unicos aceptados, insertados, actualizados por idempotencia, duplicados de batch y entradas de outbox creadas o saltadas.
 - `GET /api/telemetry/admin/retention` expone la politica efectiva de retencion Timescale y compactacion JSON.
+- `GET /api/telemetry/admin/storage/readiness` expone si TimescaleDB esta instalado, si `telemetry_events` es hypertable, columnas de primary key y bloqueadores de migracion.
 - Cada request recibe `x-request-id`.
 - Broker, worker y DB usan retries y circuit breaker simple.
 - Si RabbitMQ o PostgreSQL no responden, el sistema sigue operativo en modo degradado.
@@ -211,7 +216,7 @@ Con el lote ya tenemos una ruta mucho mas realista para probar 10.000 vehiculos 
 
 ## Brechas abiertas
 1. Falta validar el rendimiento real de TimescaleDB y RabbitMQ con mas volumen.
-2. Falta mobile offline-first con sincronizacion por lotes.
+2. Falta ejecutar la migracion formal de hypertable en un ambiente full con datos reales; el SQL y el runtime compatible ya estan versionados.
 3. Falta completar la conexion de secrets y ejecutar el apply real en AWS, aunque IaC y la pipeline de ECR ya tienen una base real en Terraform y GitHub Actions.
 4. Falta observabilidad mas profunda con logs estructurados y trazas.
 5. Falta validar la estrategia del worker bajo carga extrema con resultados de k6.

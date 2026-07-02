@@ -80,6 +80,27 @@ curl -X POST http://localhost:4001/api/telemetry/admin/outbox/dead-letters/prune
   -d "{\"olderThanDays\":14,\"dryRun\":false}"
 ```
 
+Consulta readiness de TimescaleDB e hypertable antes de una migracion formal:
+
+```bash
+curl http://localhost:4001/api/telemetry/admin/storage/readiness
+```
+
+Si `ADMIN_API_TOKEN` esta configurado, agrega `X-Admin-Token`. Revisa `migrationBlockers` antes de depender de retencion Timescale o comportamiento real de hypertable.
+
+La migracion formal esta versionada en:
+
+```text
+backend/migrations/001_timescale_hypertable_event_ids.sql
+```
+
+Estrategia:
+- `telemetry_events` queda como hypertable con primary key `(id, timestamp)`.
+- `telemetry_event_ingest_ids` conserva idempotencia por `id`.
+- El SQL usa `migrate_data => TRUE` para datos existentes.
+
+Ejecutala solo contra un stack full con backup o datos descartables de prueba. Despues vuelve a consultar readiness y confirma que `migrationBlockers` este vacio.
+
 ## Nota de ligereza
 Si notas el proyecto pesado en memoria, primero deja apagado el simulador y el worker. En modo liviano no se levantan y el portal sigue funcionando con los datos persistidos en `backend/data/events.json`.
 
@@ -94,3 +115,31 @@ La workflow `project-ci` valida cuatro frentes:
 - mobile: typecheck y smoke test offline-first
 
 La validacion de infra en CI no sustituye una prueba local completa con Docker Desktop activo, pero evita que el YAML de Compose o el formato Terraform se rompan sin ser detectados.
+
+## Errores comunes de arranque
+
+### PowerShell bloquea `npm.ps1`
+
+En este entorno Windows, PowerShell puede resolver `npm` hacia `npm.ps1` y bloquearlo por politica de ejecucion. El sintoma tipico es:
+
+```text
+No se puede cargar el archivo ...\npm.ps1 porque la ejecucion de scripts esta deshabilitada en este sistema.
+```
+
+Usa `npm.cmd` para verificaciones locales:
+
+```bash
+cd backend
+npm.cmd test
+npm.cmd run build
+```
+
+Aplica igual para frontend y mobile:
+
+```bash
+cd frontend
+npm.cmd test
+npm.cmd run build
+```
+
+Esto evita el wrapper de PowerShell sin cambiar la politica global del sistema.

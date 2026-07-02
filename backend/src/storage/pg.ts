@@ -9,6 +9,7 @@ import type {
   TelemetryOutboxStatus,
   TelemetryOutboxSummary,
 } from "./outboxTypes";
+import type { TelemetrySchemaReadiness } from "./schemaReadinessTypes";
 import { getAgentAuditConfig } from "../agent/agentAuditConfig";
 import {
   dedupeTelemetryEventsById,
@@ -45,15 +46,27 @@ async function ensureSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS telemetry_events (
-      id TEXT PRIMARY KEY,
+      id TEXT NOT NULL,
       vehicle_id TEXT NOT NULL,
       latitude DOUBLE PRECISION NULL,
       longitude DOUBLE PRECISION NULL,
       speed DOUBLE PRECISION NULL,
       status TEXT NULL,
-      timestamp TIMESTAMPTZ NOT NULL
+      timestamp TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY (id, timestamp)
     );
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS telemetry_event_ingest_ids (
+      id TEXT PRIMARY KEY,
+      event_timestamp TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await migrateTelemetryEventsForTimescale(retentionDays);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_telemetry_events_vehicle_ts
@@ -137,6 +150,87 @@ async function ensureSchema() {
   initialized = true;
 }
 
+async function migrateTelemetryEventsForTimescale(retentionDays: number) {
+  await pool.query(`
+    INSERT INTO telemetry_event_ingest_ids (id, event_timestamp)
+    SELECT DISTINCT ON (id) id, timestamp
+    FROM telemetry_events
+    ORDER BY id, timestamp DESC
+    ON CONFLICT (id) DO UPDATE
+    SET event_timestamp = EXCLUDED.event_timestamp,
+        updated_at = NOW();
+  `);
+
+  await pool.query(`
+    DO $$
+    DECLARE
+      pk_name TEXT;
+      pk_columns TEXT[];
+    BEGIN
+      SELECT con.conname, array_agg(att.attname ORDER BY key.ordinality)
+      INTO pk_name, pk_columns
+      FROM pg_constraint con
+      JOIN unnest(con.conkey) WITH ORDINALITY AS key(attnum, ordinality)
+        ON TRUE
+      JOIN pg_attribute att
+        ON att.attrelid = con.conrelid
+       AND att.attnum = key.attnum
+      WHERE con.conrelid = 'telemetry_events'::regclass
+        AND con.contype = 'p'
+      GROUP BY con.conname;
+
+      IF pk_name IS NOT NULL AND pk_columns = ARRAY['id'] THEN
+        EXECUTE format('ALTER TABLE telemetry_events DROP CONSTRAINT %I', pk_name);
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'telemetry_events'::regclass
+          AND contype = 'p'
+      ) THEN
+        ALTER TABLE telemetry_events
+        ADD CONSTRAINT telemetry_events_pkey PRIMARY KEY (id, timestamp);
+      END IF;
+    END $$;
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM pg_extension
+        WHERE extname = 'timescaledb'
+      ) THEN
+        BEGIN
+          PERFORM create_hypertable(
+            'telemetry_events',
+            'timestamp',
+            if_not_exists => TRUE,
+            migrate_data => TRUE
+          );
+        EXCEPTION
+          WHEN duplicate_table THEN
+            NULL;
+          WHEN undefined_function THEN
+            NULL;
+        END;
+
+        BEGIN
+          PERFORM remove_retention_policy('telemetry_events', if_exists => TRUE);
+          PERFORM add_retention_policy('telemetry_events', INTERVAL '${retentionDays} days', if_not_exists => TRUE);
+        EXCEPTION
+          WHEN duplicate_object THEN
+            NULL;
+          WHEN undefined_function THEN
+            NULL;
+        END;
+      END IF;
+    END $$;
+  `).catch(() => null);
+}
+
 async function executeDb<T>(fn: () => Promise<T>): Promise<T> {
   if (!dbBreaker.canExecute()) {
     throw new Error("db_circuit_open");
@@ -181,6 +275,19 @@ function buildInsertStatement(events: TelemetryEvent[]) {
   return { values, rows };
 }
 
+function buildIngestIdStatement(events: TelemetryEvent[]) {
+  const values: unknown[] = [];
+  const rows = events
+    .map((event, index) => {
+      const base = index * 2;
+      values.push(event.id, event.timestamp);
+      return `($${base + 1}, to_timestamp($${base + 2} / 1000.0))`;
+    })
+    .join(", ");
+
+  return { values, rows };
+}
+
 function chunkEvents(events: TelemetryEvent[], chunkSize: number) {
   const chunks: TelemetryEvent[][] = [];
 
@@ -197,22 +304,53 @@ export async function insertEvents(events: TelemetryEvent[]) {
 
   return executeDb(async () => {
     await ensureSchema();
-    for (const chunk of chunkEvents(uniqueEvents, INSERT_CHUNK_SIZE)) {
-      const { values, rows } = buildInsertStatement(chunk);
-      await pool.query(
-        `
-        INSERT INTO telemetry_events (id, vehicle_id, latitude, longitude, speed, status, timestamp)
-        VALUES ${rows}
-        ON CONFLICT (id) DO UPDATE
-        SET vehicle_id = EXCLUDED.vehicle_id,
-            latitude = EXCLUDED.latitude,
-            longitude = EXCLUDED.longitude,
-            speed = EXCLUDED.speed,
-            status = EXCLUDED.status,
-            timestamp = EXCLUDED.timestamp
-        `,
-        values
-      );
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      for (const chunk of chunkEvents(uniqueEvents, INSERT_CHUNK_SIZE)) {
+        const ids = chunk.map((event) => event.id);
+        await client.query(
+          `
+          DELETE FROM telemetry_events
+          WHERE id = ANY($1::text[])
+          `,
+          [ids]
+        );
+
+        const { values, rows } = buildInsertStatement(chunk);
+        await client.query(
+          `
+          INSERT INTO telemetry_events (id, vehicle_id, latitude, longitude, speed, status, timestamp)
+          VALUES ${rows}
+          ON CONFLICT (id, timestamp) DO UPDATE
+          SET vehicle_id = EXCLUDED.vehicle_id,
+              latitude = EXCLUDED.latitude,
+              longitude = EXCLUDED.longitude,
+              speed = EXCLUDED.speed,
+              status = EXCLUDED.status
+          `,
+          values
+        );
+
+        const ingest = buildIngestIdStatement(chunk);
+        await client.query(
+          `
+          INSERT INTO telemetry_event_ingest_ids (id, event_timestamp)
+          VALUES ${ingest.rows}
+          ON CONFLICT (id) DO UPDATE
+          SET event_timestamp = EXCLUDED.event_timestamp,
+              updated_at = NOW()
+          `,
+          ingest.values
+        );
+      }
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => null);
+      throw err;
+    } finally {
+      client.release();
     }
   });
 }
@@ -234,7 +372,7 @@ export async function saveEventsWithOutbox(
       const existing = await client.query<{ id: string }>(
         `
         SELECT id
-        FROM telemetry_events
+        FROM telemetry_event_ingest_ids
         WHERE id = ANY($1::text[])
         `,
         [uniqueIds]
@@ -243,20 +381,40 @@ export async function saveEventsWithOutbox(
       let outboxCreated = 0;
 
       for (const chunk of chunkEvents(uniqueEvents, INSERT_CHUNK_SIZE)) {
+        const ids = chunk.map((event) => event.id);
+        await client.query(
+          `
+          DELETE FROM telemetry_events
+          WHERE id = ANY($1::text[])
+          `,
+          [ids]
+        );
+
         const { values, rows } = buildInsertStatement(chunk);
         await client.query(
           `
           INSERT INTO telemetry_events (id, vehicle_id, latitude, longitude, speed, status, timestamp)
           VALUES ${rows}
-          ON CONFLICT (id) DO UPDATE
+          ON CONFLICT (id, timestamp) DO UPDATE
           SET vehicle_id = EXCLUDED.vehicle_id,
               latitude = EXCLUDED.latitude,
               longitude = EXCLUDED.longitude,
               speed = EXCLUDED.speed,
-              status = EXCLUDED.status,
-              timestamp = EXCLUDED.timestamp
+              status = EXCLUDED.status
           `,
           values
+        );
+
+        const ingest = buildIngestIdStatement(chunk);
+        await client.query(
+          `
+          INSERT INTO telemetry_event_ingest_ids (id, event_timestamp)
+          VALUES ${ingest.rows}
+          ON CONFLICT (id) DO UPDATE
+          SET event_timestamp = EXCLUDED.event_timestamp,
+              updated_at = NOW()
+          `,
+          ingest.values
         );
 
         const outboxValues: unknown[] = [];
@@ -743,6 +901,125 @@ export async function pruneDeadOutboxLetters(
       matched,
       deleted,
       retained: Number(retainedResult.rows[0]?.count ?? 0),
+    };
+  });
+}
+
+async function getTelemetryPrimaryKeyColumns() {
+  const result = await pool.query<{ column_name: string }>(
+    `
+    SELECT att.attname AS column_name
+    FROM pg_index idx
+    JOIN pg_attribute att
+      ON att.attrelid = idx.indrelid
+     AND att.attnum = ANY(idx.indkey)
+    WHERE idx.indrelid = 'telemetry_events'::regclass
+      AND idx.indisprimary
+    ORDER BY att.attnum
+    `
+  );
+
+  return result.rows.map((row) => row.column_name);
+}
+
+async function isTelemetryHypertable() {
+  const result = await pool
+    .query<{ active: boolean }>(
+      `
+      SELECT EXISTS (
+        SELECT 1
+        FROM timescaledb_information.hypertables
+        WHERE hypertable_name = 'telemetry_events'
+      ) AS active
+      `
+    )
+    .catch(() => ({ rows: [{ active: false }] }));
+
+  return Boolean(result.rows[0]?.active);
+}
+
+export async function getTelemetrySchemaReadiness(): Promise<TelemetrySchemaReadiness> {
+  return executeDb(async () => {
+    await ensureSchema();
+    const generatedAt = Date.now();
+    const status = await pool.query<{
+      table_exists: boolean;
+      ingest_ids_table_exists: boolean;
+      timescale_extension_installed: boolean;
+    }>(
+      `
+      SELECT
+        to_regclass('public.telemetry_events') IS NOT NULL AS table_exists,
+        to_regclass('public.telemetry_event_ingest_ids') IS NOT NULL AS ingest_ids_table_exists,
+        EXISTS (
+          SELECT 1
+          FROM pg_extension
+          WHERE extname = 'timescaledb'
+        ) AS timescale_extension_installed
+      `
+    );
+    const tableExists = Boolean(status.rows[0]?.table_exists);
+    const idempotencyTableExists = Boolean(status.rows[0]?.ingest_ids_table_exists);
+    const timescaleExtensionInstalled = Boolean(
+      status.rows[0]?.timescale_extension_installed
+    );
+    const primaryKeyColumns = tableExists ? await getTelemetryPrimaryKeyColumns() : [];
+    const hypertableActive =
+      tableExists && timescaleExtensionInstalled ? await isTelemetryHypertable() : false;
+    const migrationBlockers: string[] = [];
+
+    if (!timescaleExtensionInstalled) {
+      migrationBlockers.push("timescaledb_extension_missing");
+    }
+
+    if (!tableExists) {
+      migrationBlockers.push("telemetry_events_table_missing");
+    }
+
+    if (!idempotencyTableExists) {
+      migrationBlockers.push("telemetry_event_ingest_ids_missing");
+    }
+
+    if (
+      tableExists &&
+      !hypertableActive &&
+      primaryKeyColumns.length > 0 &&
+      !primaryKeyColumns.includes("timestamp")
+    ) {
+      migrationBlockers.push("primary_key_without_time_column");
+    }
+
+    if (tableExists && timescaleExtensionInstalled && !hypertableActive) {
+      migrationBlockers.push("telemetry_events_not_hypertable");
+    }
+
+    return {
+      generatedAt,
+      activeStorage: "postgres",
+      postgres: {
+        configured: true,
+        connected: true,
+        tableExists,
+        timescaleExtensionInstalled,
+        hypertable: {
+          expected: true,
+          active: hypertableActive,
+          table: "telemetry_events",
+          timeColumn: "timestamp",
+          mode: "best_effort_on_schema_init",
+        },
+        idempotencyTableExists,
+        primaryKeyColumns,
+        migrationBlockers,
+      },
+      fallback: {
+        jsonAvailable: true,
+        reason: null,
+      },
+      recommendation:
+        migrationBlockers.length === 0
+          ? "TimescaleDB hypertable readiness is healthy for telemetry_events."
+          : "Review migrationBlockers before relying on TimescaleDB retention and hypertable behavior in production.",
     };
   });
 }

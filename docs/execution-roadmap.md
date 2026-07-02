@@ -5,7 +5,7 @@ Este plan refleja el estado actual del repo y los siguientes pasos mas utiles pa
 ## Estado actual por fase
 | Fase | Estado | Hecho | Falta |
 | --- | --- | --- | --- |
-| Fase 1: Fundacion de datos y eventos | 90% MVP | RabbitMQ, TimescaleDB/PostgreSQL, JSON fallback, retries, circuit breaker, simulador, lectura administrativa del outbox, configuracion efectiva del worker, metricas de idempotencia y politica visible de retencion/compactacion | Validar volumen extendido, migraciones de hypertable y caos |
+| Fase 1: Fundacion de datos y eventos | 96% MVP | RabbitMQ, TimescaleDB/PostgreSQL, JSON fallback, retries, circuit breaker, simulador, lectura administrativa del outbox, configuracion efectiva del worker, metricas de idempotencia, politica visible de retencion/compactacion, readiness de hypertable y migracion formal versionada | Ejecutar migracion en ambiente real, validar volumen extendido y caos |
 | Fase 2: Resiliencia y observabilidad | En curso | `/health`, `/metrics`, request ids, counters, timings y logs estructurados en el camino critico | Trazas distribuidas, alertas y unificacion total de logs secundarios |
 | Fase 3: Portal corporativo | Casi completa | Mapa, alertas, salud, metricas, detalle de vehiculo y chat IA | Pulido visual, timeline operativo y refinamiento de UX |
 | Fase 4: Desarrollo de agente IA avanzado | En curso | Tool calling, JSON estructurado y zonas criticas deterministicas | Consultas multi-turn, mejor validacion de respuestas y trazabilidad de prompts |

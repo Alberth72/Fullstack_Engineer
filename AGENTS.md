@@ -140,6 +140,6 @@ For each implementation task:
 2. classify the request with the AgentOps route from `docs/agent-operating-model.md`
 3. explain the intended change briefly
 4. implement in small cohesive edits
-5. run relevant build/test commands
+5. run relevant build/test commands; on this Windows PowerShell workspace use `npm.cmd` instead of `npm` to avoid the blocked `npm.ps1` wrapper
 6. update docs when behavior, architecture, runbooks, prompts, or contracts change
 7. summarize what changed, how it was verified, risks, and what remains

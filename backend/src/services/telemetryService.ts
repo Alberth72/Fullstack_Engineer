@@ -2,6 +2,7 @@ import { telemetryApplication } from "../application/telemetry";
 import { getTelemetryOutboxWorkerConfig } from "../events/outboxWorkerConfig";
 import { getOutboxSummary, pruneDeadOutboxLetters } from "../storage/telemetryOutbox";
 import { getTelemetryRetentionPolicy } from "../storage/telemetryRetentionPolicy";
+import { getTelemetrySchemaReadiness } from "../storage/telemetrySchemaReadiness";
 
 export const recordEvent = telemetryApplication.recordEvent;
 export const recordEvents = telemetryApplication.recordEvents;
@@ -19,3 +20,4 @@ export const getTelemetryOutboxSummary = getOutboxSummary;
 export const pruneTelemetryOutboxDeadLetters = pruneDeadOutboxLetters;
 export const getTelemetryOutboxWorkerEffectiveConfig = getTelemetryOutboxWorkerConfig;
 export const getTelemetryRetentionEffectivePolicy = getTelemetryRetentionPolicy;
+export const getTelemetryStorageReadiness = getTelemetrySchemaReadiness;
