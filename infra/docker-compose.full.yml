@@ -23,6 +23,7 @@ services:
     environment:
       DATABASE_URL: postgres://fleet:fleet@postgres:5432/fleet
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      TELEMETRY_API_BASE: http://backend:4001/api
       TELEMETRY_SIM_VEHICLES: ${TELEMETRY_SIM_VEHICLES:-3}
 
   worker:

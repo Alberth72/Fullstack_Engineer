@@ -4,6 +4,7 @@ Use this document to start Codex in the right working mode for each phase of the
 
 Los prompts versionados viven en `docs/prompts/` y se actualizan junto con la arquitectura o el flujo de trabajo.
 La jerarquia de niveles y responsabilidades vive en `docs/prompts/hierarchy.md`.
+El modelo operativo AgentOps vive en `docs/agent-operating-model.md` y define rutas de trabajo, mapa de impacto, contratos, gates de calidad y memoria operativa.
 
 ## Orchestrator Mode
 
@@ -36,6 +37,15 @@ Use this structure when coordinating specialists:
 4. Exigir validacion tecnica: build, test, lint, smoke test o razon explicita.
 5. Reflejar los cambios de arquitectura en la documentacion.
 ```
+
+Antes de dividir trabajo, clasifica la solicitud con una de las rutas de AgentOps:
+- ruta rapida
+- ruta estandar
+- ruta arquitectura
+- ruta incidente
+- ruta exploracion
+
+Despues define mapa de impacto, contrato de tarea, verificacion minima y gates de cierre segun `docs/agent-operating-model.md`.
 
 ### Active fronts
 

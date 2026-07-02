@@ -185,5 +185,5 @@ Revisa [docs/continuous-deployment.md](/D:/Github/Fullstack_Engineer/docs/contin
 - `backend/` - API, agente IA, persistencia y broker.
 - `frontend/` - dashboard operacional en Next.js.
 - `infra/` - Docker Compose, prueba de carga y Terraform para AWS.
-- `docs/` - arquitectura, roadmap, auditoria de IA y matriz de cumplimiento.
+- `docs/` - arquitectura, roadmap, auditoria de IA, matriz de cumplimiento y modelo operativo AgentOps.
 - `mobile/` - app Expo/React Native offline-first con cola local y sincronizacion por lotes.

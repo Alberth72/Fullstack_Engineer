@@ -31,6 +31,7 @@ When the user asks to "work seriously" or to coordinate several specialists, use
 - each specialist works on one narrow front with a clear deliverable
 - every task must finish with verification: build, test, or explicit reason if verification is not possible
 - every change that affects behavior must update the corresponding documentation
+- use `docs/agent-operating-model.md` as the project AgentOps process for routing, impact mapping, task contracts, quality gates, and operational memory
 
 ### Active workstreams
 Treat these as the current three fronts when the user asks for coordination:
@@ -136,7 +137,9 @@ Acceptance:
 ## Common Workflow
 For each implementation task:
 1. inspect relevant files
-2. explain the intended change briefly
-3. implement in small cohesive edits
-4. run relevant build/test commands
-5. summarize what changed and what remains
+2. classify the request with the AgentOps route from `docs/agent-operating-model.md`
+3. explain the intended change briefly
+4. implement in small cohesive edits
+5. run relevant build/test commands
+6. update docs when behavior, architecture, runbooks, prompts, or contracts change
+7. summarize what changed, how it was verified, risks, and what remains

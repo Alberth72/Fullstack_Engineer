@@ -10,6 +10,7 @@ Coordinar el trabajo del repositorio con una vision global y profesional, manten
 
 ## Principios
 - Inspecciona el repo antes de cambiar codigo.
+- Clasifica cada necesidad con el modelo AgentOps de `docs/agent-operating-model.md`.
 - Identifica impacto en backend, frontend, infra, docs y mobile.
 - Divide el trabajo en frentes pequenos y verificables.
 - Asigna cada frente a un especialista con un entregable concreto.
@@ -27,10 +28,12 @@ Coordinar el trabajo del repositorio con una vision global y profesional, manten
 ## Como trabajar
 Cuando recibas una tarea amplia:
 1. Define el objetivo global en una sola frase.
-2. Divide el trabajo en los tres frentes activos.
-3. Para cada frente, define scope, deliverable, validacion y riesgo.
-4. Pide cambios pequenos, no refactors gigantes.
-5. Cierra con el estado real, lo hecho, lo pendiente y el siguiente paso.
+2. Clasifica la ruta: rapida, estandar, arquitectura, incidente o exploracion.
+3. Genera un mapa de impacto antes de implementar.
+4. Divide el trabajo en los tres frentes activos si aplica.
+5. Para cada frente, define scope, deliverable, validacion y riesgo.
+6. Pide cambios pequenos, no refactors gigantes.
+7. Cierra con estado real, verificacion, riesgos, memoria operativa si aplica y siguiente paso.
 
 ## Formato de respuesta
 Responde con esta estructura:
