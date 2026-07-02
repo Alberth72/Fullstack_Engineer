@@ -19,7 +19,7 @@ MVP para monitoreo de flotas con ingesta de telemetria, agente IA, dashboard ope
 - Frontend: Next.js 13.4, React 18, react-leaflet, leaflet, TypeScript.
 - Datos: TimescaleDB sobre PostgreSQL, con fallback JSON local.
 - Mensajeria: RabbitMQ.
-- Observabilidad: `/health`, `/metrics`, request ids, counters y timings.
+- Observabilidad: `/health`, `/metrics`, `/diagnostics`, alertas operativas, request ids, counters y timings.
 - Infra: Docker Compose, k6, Terraform para AWS, ECR, ECS/Fargate y GitHub Actions CD.
 - Mobile: Expo/React Native offline-first con TypeScript, SQLite, cola local y sync batch contra el backend.
 
@@ -125,7 +125,7 @@ npm run dev
 | `GET` | `/api/agent/admin/config` | Ver configuracion efectiva de auditoria IA |
 | `GET` | `/health` | Ver estado de salud del backend |
 | `GET` | `/metrics` | Ver metricas basicas del backend |
-| `GET` | `/diagnostics` | Ver diagnostico operacional protegido con health, metricas y ultimos warn/error |
+| `GET` | `/diagnostics` | Ver diagnostico operacional protegido con health, metricas, alertas y ultimos warn/error |
 
 ## Pruebas
 - `cd backend && npm test` ejecuta los tests unitarios una sola vez.
@@ -182,7 +182,7 @@ Revisa [docs/continuous-deployment.md](/D:/Github/Fullstack_Engineer/docs/contin
 - Completar mobile offline-first con captura GPS real en background, permisos, pruebas en dispositivo y CI/CD movil.
 - CD movil con artefactos instalables y distribucion controlada; backend/frontend ya tienen CI y despliegue continuo hacia AWS.
 - Validacion de carga y resiliencia con mas volumen real sobre TimescaleDB y RabbitMQ, incluyendo escenarios con lote.
-- Observabilidad mas completa con logs estructurados y trazas.
+- Observabilidad mas completa con trazas distribuidas.
 - Cierre incremental de Backend / Events documentado en `docs/backend-events-workflow.md`.
 
 ## Estructura del repo

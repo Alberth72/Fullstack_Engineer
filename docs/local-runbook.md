@@ -52,14 +52,14 @@ Credenciales locales por defecto:
 ## Flujo de prueba sugerido
 1. Abre el frontend y verifica que cargue el dashboard.
 2. Abre el endpoint de health del backend.
-3. Consulta `/diagnostics` con token admin si esta configurado para ver health, metricas y problemas recientes.
+3. Consulta `/diagnostics` con token admin si esta configurado para ver health, metricas, alertas operativas y problemas recientes.
 4. Consulta `GET /api/telemetry/state` para ver la flota.
 5. Envia un evento o lote de telemetria para observar el outbox y la publicacion.
 6. Usa el chat IA con `conversationId` repetido para validar el modo multi-turn.
 7. Abre RabbitMQ Management y confirma colas y mensajes.
 
 ## Diagnostico operacional
-`GET /diagnostics` resume health, metricas, contadores de error y ultimos logs `warn`/`error` del proceso. Si `ADMIN_API_TOKEN` esta configurado, requiere `Authorization: Bearer <token>` o `X-Admin-Token`.
+`GET /diagnostics` resume health, metricas, alertas operativas, contadores de error y ultimos logs `warn`/`error` del proceso. Si `ADMIN_API_TOKEN` esta configurado, requiere `Authorization: Bearer <token>` o `X-Admin-Token`.
 
 ```bash
 curl http://localhost:4001/diagnostics
@@ -73,6 +73,13 @@ curl http://localhost:4001/diagnostics -H "X-Admin-Token: <token>"
 
 El worker tambien expone `GET /diagnostics` en `http://localhost:4002/diagnostics` cuando corre el modo full.
 Los logs del backend, worker, simulador y fallback JSON salen como JSON estructurado a stdout/stderr. Los `warn` y `error` recientes quedan visibles en `/diagnostics`.
+
+La respuesta incluye:
+- `attentionRequired`: `true` cuando existe al menos una alerta.
+- `alertSummary`: conteo total y por severidad.
+- `alerts`: lista accionable con `severity`, `code`, `source`, `message`, `count` y contexto opcional.
+
+Las alertas actuales se derivan de dependencias configuradas no conectadas, errores de ingesta/publicacion, dead letters del outbox, circuit breaker del notificador, reintentos, errores del agente y logs recientes `warn`/`error`.
 
 ## Operacion del outbox
 Consulta el estado operativo del outbox:

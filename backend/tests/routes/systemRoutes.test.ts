@@ -86,6 +86,19 @@ describe("system routes", () => {
     expect(accepted.body).toMatchObject({
       status: expect.any(String),
       attentionRequired: true,
+      alertSummary: {
+        total: expect.any(Number),
+        bySeverity: expect.objectContaining({
+          warning: expect.any(Number),
+        }),
+      },
+      alerts: expect.arrayContaining([
+        expect.objectContaining({
+          severity: "warning",
+          code: "recent_warning_logs",
+          source: "logs",
+        }),
+      ]),
       role: "api",
       runtime: expect.any(Object),
       metrics: expect.any(Object),

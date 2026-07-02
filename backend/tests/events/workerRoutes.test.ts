@@ -55,6 +55,11 @@ describe("worker routes", () => {
     expect(accepted.body).toMatchObject({
       status: expect.any(String),
       attentionRequired: expect.any(Boolean),
+      alertSummary: {
+        total: expect.any(Number),
+        bySeverity: expect.any(Object),
+      },
+      alerts: expect.any(Array),
       role: "outbox-worker",
       runtime: expect.any(Object),
       metrics: expect.any(Object),
