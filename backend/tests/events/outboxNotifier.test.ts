@@ -9,6 +9,7 @@ vi.mock("axios", () => ({
 }));
 
 import { notifyTelemetryOutboxWorker } from "../../src/events/outboxNotifier";
+import type { TraceContext } from "../../src/observability/tracing";
 
 describe("outbox notifier", () => {
   const originalUrl = process.env.OUTBOX_WORKER_URL;
@@ -82,6 +83,53 @@ describe("outbox notifier", () => {
         headers: {
           "X-Admin-Token": "secret-token",
         },
+      })
+    );
+  });
+
+  it("forwards trace headers and body metadata to the worker", async () => {
+    process.env.OUTBOX_WORKER_URL = "http://worker:4002";
+    mockPost.mockResolvedValue({ status: 202 });
+    const trace: TraceContext = {
+      traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      spanId: "bbbbbbbbbbbbbbbb",
+      parentSpanId: null,
+      requestId: "req-test",
+      sampled: true,
+    };
+
+    await notifyTelemetryOutboxWorker(
+      [
+        {
+          id: "evt-1",
+          vehicle_id: "veh-1",
+          latitude: 19.43,
+          longitude: -99.13,
+          speed: 45,
+          status: "moving",
+          timestamp: 1700000000000,
+        },
+      ],
+      trace
+    );
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "http://worker:4002/internal/outbox/notify",
+      expect.objectContaining({
+        trace: expect.objectContaining({
+          traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          parentSpanId: "bbbbbbbbbbbbbbbb",
+          requestId: "req-test",
+        }),
+      }),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "X-Trace-Id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "X-Request-Id": "req-test",
+          traceparent: expect.stringMatching(
+            /^00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-[a-f0-9]{16}-01$/
+          ),
+        }),
       })
     );
   });

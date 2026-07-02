@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTelemetryApplication } from "../../../src/application/telemetry/useCases";
 import type { TelemetryRepositoryPort } from "../../../src/application/telemetry/ports";
 import { snapshotMetrics } from "../../../src/observability/metrics";
+import type { TraceContext } from "../../../src/observability/tracing";
 import { getCriticalZones } from "../../../src/services/criticalZones";
 import type { FleetVehicleState, TelemetryEvent } from "../../../src/types/telemetry";
 
@@ -52,7 +53,7 @@ describe("application/telemetry", () => {
     });
     expect(event.id).toEqual(expect.any(String));
     expect(saveEvents).toHaveBeenCalledTimes(1);
-    expect(saveEvents).toHaveBeenCalledWith([event]);
+    expect(saveEvents).toHaveBeenCalledWith([event], undefined);
   });
 
   it("returns a normalized snapshot and summary", async () => {
@@ -209,5 +210,37 @@ describe("application/telemetry", () => {
     expect(after.telemetryEventsDuplicateInBatch - before.telemetryEventsDuplicateInBatch).toBe(1);
     expect(after.telemetryOutboxCreated - before.telemetryOutboxCreated).toBe(0);
     expect(after.telemetryOutboxSkipped - before.telemetryOutboxSkipped).toBe(1);
+  });
+
+  it("propagates trace context to repository and outbox notifier", async () => {
+    const trace: TraceContext = {
+      traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      spanId: "bbbbbbbbbbbbbbbb",
+      parentSpanId: null,
+      requestId: "req-test",
+      sampled: true,
+    };
+    const saveEvents = vi.fn().mockResolvedValue(undefined);
+    const notify = vi.fn().mockResolvedValue(undefined);
+    const repository = createRepositoryMock({ saveEvents });
+    const app = createTelemetryApplication({
+      repository,
+      clock: () => 1700000000000,
+      outboxNotifier: { notify },
+    });
+
+    const events = await app.recordEvents(
+      [
+        {
+          id: "evt-traced",
+          vehicle_id: "veh-1",
+          timestamp: 1700000000000,
+        },
+      ],
+      trace
+    );
+
+    expect(saveEvents).toHaveBeenCalledWith(events, trace);
+    expect(notify).toHaveBeenCalledWith(events, trace);
   });
 });

@@ -2,9 +2,14 @@ import type { WebSocketServer } from "ws";
 import { subscribeTelemetry } from "./broadcaster";
 import type { TelemetryEvent } from "../types/telemetry";
 import { logger } from "../observability/logger";
+import { traceLogContext, type TraceContext } from "../observability/tracing";
 
-function broadcastTelemetryEvent(wss: WebSocketServer, event: TelemetryEvent) {
-  const message = JSON.stringify({ type: "telemetry", event });
+function broadcastTelemetryEvent(
+  wss: WebSocketServer,
+  event: TelemetryEvent,
+  trace?: TraceContext | null
+) {
+  const message = JSON.stringify({ type: "telemetry", event, trace: trace ?? null });
 
   wss.clients.forEach((client) => {
     try {
@@ -13,6 +18,7 @@ function broadcastTelemetryEvent(wss: WebSocketServer, event: TelemetryEvent) {
       }
     } catch (err) {
       logger.warn("ws_send_failed", {
+        ...traceLogContext(trace),
         error: logger.serializeError(err),
       });
     }
@@ -20,7 +26,7 @@ function broadcastTelemetryEvent(wss: WebSocketServer, event: TelemetryEvent) {
 }
 
 export function registerTelemetryConsumers(wss: WebSocketServer) {
-  subscribeTelemetry((event) => {
-    broadcastTelemetryEvent(wss, event);
+  subscribeTelemetry((event, trace) => {
+    broadcastTelemetryEvent(wss, event, trace);
   });
 }

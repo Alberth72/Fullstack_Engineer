@@ -3,14 +3,15 @@ import { EventEmitter } from "events";
 import { TelemetryEvent } from "../types/telemetry";
 import { CircuitBreaker, withRetry } from "../utils/resilience";
 import { logger } from "../observability/logger";
+import type { TraceContext } from "../observability/tracing";
 
-type TelemetryHandler = (event: TelemetryEvent) => void | Promise<void>;
+type TelemetryHandler = (event: TelemetryEvent, trace?: TraceContext | null) => void | Promise<void>;
 
 type Broker = {
-  publishTelemetry(event: TelemetryEvent): Promise<void>;
-  publishTelemetryBatch(events: TelemetryEvent[]): Promise<void>;
-  publishTelemetryStrict(event: TelemetryEvent): Promise<void>;
-  publishTelemetryBatchStrict(events: TelemetryEvent[]): Promise<void>;
+  publishTelemetry(event: TelemetryEvent, trace?: TraceContext | null): Promise<void>;
+  publishTelemetryBatch(events: TelemetryEvent[], trace?: TraceContext | null): Promise<void>;
+  publishTelemetryStrict(event: TelemetryEvent, trace?: TraceContext | null): Promise<void>;
+  publishTelemetryBatchStrict(events: TelemetryEvent[], trace?: TraceContext | null): Promise<void>;
   subscribeTelemetry(handler: TelemetryHandler): void;
   start(): Promise<void>;
   isConnected(): Promise<boolean>;
@@ -24,32 +25,37 @@ type TelemetryEnvelope =
   | {
       type: "telemetry";
       event: TelemetryEvent;
+      trace?: TraceContext | null;
     }
   | {
       type: "telemetry_batch";
       events: TelemetryEvent[];
+      trace?: TraceContext | null;
     };
 
-function extractTelemetryEvents(payload: unknown): TelemetryEvent[] {
+function extractTelemetryMessage(payload: unknown): {
+  events: TelemetryEvent[];
+  trace: TraceContext | null;
+} {
   if (!payload || typeof payload !== "object") {
-    return [];
+    return { events: [], trace: null };
   }
 
   const message = payload as Partial<TelemetryEnvelope> & Partial<TelemetryEvent>;
 
   if (message.type === "telemetry_batch" && Array.isArray(message.events)) {
-    return message.events;
+    return { events: message.events, trace: message.trace ?? null };
   }
 
   if (message.type === "telemetry" && message.event) {
-    return [message.event];
+    return { events: [message.event], trace: message.trace ?? null };
   }
 
   if ("vehicle_id" in message && "timestamp" in message) {
-    return [message as TelemetryEvent];
+    return { events: [message as TelemetryEvent], trace: null };
   }
 
-  return [];
+  return { events: [], trace: null };
 }
 
 class InMemoryBroker implements Broker {
@@ -59,22 +65,22 @@ class InMemoryBroker implements Broker {
     return;
   }
 
-  async publishTelemetry(event: TelemetryEvent) {
-    this.emitter.emit("telemetry", event);
+  async publishTelemetry(event: TelemetryEvent, trace?: TraceContext | null) {
+    this.emitter.emit("telemetry", event, trace ?? null);
   }
 
-  async publishTelemetryBatch(events: TelemetryEvent[]) {
+  async publishTelemetryBatch(events: TelemetryEvent[], trace?: TraceContext | null) {
     for (const event of events) {
-      this.emitter.emit("telemetry", event);
+      this.emitter.emit("telemetry", event, trace ?? null);
     }
   }
 
-  async publishTelemetryStrict(event: TelemetryEvent) {
-    return this.publishTelemetry(event);
+  async publishTelemetryStrict(event: TelemetryEvent, trace?: TraceContext | null) {
+    return this.publishTelemetry(event, trace);
   }
 
-  async publishTelemetryBatchStrict(events: TelemetryEvent[]) {
-    return this.publishTelemetryBatch(events);
+  async publishTelemetryBatchStrict(events: TelemetryEvent[], trace?: TraceContext | null) {
+    return this.publishTelemetryBatch(events, trace);
   }
 
   subscribeTelemetry(handler: TelemetryHandler) {
@@ -176,7 +182,7 @@ class RabbitBroker implements Broker {
         if (!msg) return;
         try {
           const parsed = JSON.parse(msg.content.toString()) as unknown;
-          const events = extractTelemetryEvents(parsed);
+          const { events, trace } = extractTelemetryMessage(parsed);
 
           if (!events.length) {
             throw new Error("invalid_telemetry_message");
@@ -184,7 +190,7 @@ class RabbitBroker implements Broker {
 
           for (const event of events) {
             for (const handler of this.handlers) {
-              await handler(event);
+              await handler(event, trace);
             }
           }
           this.channel.ack(msg);
@@ -229,43 +235,43 @@ class RabbitBroker implements Broker {
     void this.connect();
   }
 
-  async publishTelemetry(event: TelemetryEvent) {
+  async publishTelemetry(event: TelemetryEvent, trace?: TraceContext | null) {
     try {
-      await this.publishTelemetryStrict(event);
+      await this.publishTelemetryStrict(event, trace);
     } catch (err) {
       logger.warn("broker_publish_fallback", {
         error: logger.serializeError(err),
       });
-      return this.fallback.publishTelemetry(event);
+      return this.fallback.publishTelemetry(event, trace);
     }
   }
 
-  async publishTelemetryBatch(events: TelemetryEvent[]) {
+  async publishTelemetryBatch(events: TelemetryEvent[], trace?: TraceContext | null) {
     if (!events.length) return;
 
     if (!this.breaker.canExecute()) {
-      return this.fallback.publishTelemetryBatch(events);
+      return this.fallback.publishTelemetryBatch(events, trace);
     }
 
     if (!this.ready || !this.channel) {
-      return this.fallback.publishTelemetryBatch(events);
+      return this.fallback.publishTelemetryBatch(events, trace);
     }
 
     try {
-      await this.publishTelemetryBatchStrict(events);
+      await this.publishTelemetryBatchStrict(events, trace);
     } catch (err) {
       logger.warn("broker_publish_batch_fallback", {
         error: logger.serializeError(err),
       });
-      return this.fallback.publishTelemetryBatch(events);
+      return this.fallback.publishTelemetryBatch(events, trace);
     }
   }
 
-  async publishTelemetryStrict(event: TelemetryEvent) {
-    return this.publishTelemetryBatchStrict([event]);
+  async publishTelemetryStrict(event: TelemetryEvent, trace?: TraceContext | null) {
+    return this.publishTelemetryBatchStrict([event], trace);
   }
 
-  async publishTelemetryBatchStrict(events: TelemetryEvent[]) {
+  async publishTelemetryBatchStrict(events: TelemetryEvent[], trace?: TraceContext | null) {
     if (!events.length) return;
 
     if (!this.breaker.canExecute()) {
@@ -286,6 +292,7 @@ class RabbitBroker implements Broker {
               JSON.stringify({
                 type: "telemetry_batch",
                 events,
+                trace: trace ?? null,
               } satisfies TelemetryEnvelope)
             ),
             {
@@ -333,20 +340,23 @@ export async function isBrokerConnected() {
   return broker.isConnected();
 }
 
-export async function publishTelemetry(event: TelemetryEvent) {
-  await broker.publishTelemetry(event);
+export async function publishTelemetry(event: TelemetryEvent, trace?: TraceContext | null) {
+  await broker.publishTelemetry(event, trace);
 }
 
-export async function publishTelemetryBatch(events: TelemetryEvent[]) {
-  await broker.publishTelemetryBatch(events);
+export async function publishTelemetryBatch(events: TelemetryEvent[], trace?: TraceContext | null) {
+  await broker.publishTelemetryBatch(events, trace);
 }
 
-export async function publishTelemetryStrict(event: TelemetryEvent) {
-  await broker.publishTelemetryStrict(event);
+export async function publishTelemetryStrict(event: TelemetryEvent, trace?: TraceContext | null) {
+  await broker.publishTelemetryStrict(event, trace);
 }
 
-export async function publishTelemetryBatchStrict(events: TelemetryEvent[]) {
-  await broker.publishTelemetryBatchStrict(events);
+export async function publishTelemetryBatchStrict(
+  events: TelemetryEvent[],
+  trace?: TraceContext | null
+) {
+  await broker.publishTelemetryBatchStrict(events, trace);
 }
 
 export function subscribeTelemetry(handler: TelemetryHandler) {

@@ -1,3 +1,4 @@
+import "./observability/otel";
 import { createServer } from "http";
 import { json } from "body-parser";
 import express from "express";
@@ -8,6 +9,7 @@ import { incrementCounter, recordTiming, snapshotMetrics } from "./observability
 import { probeRuntimeHealth } from "./observability/runtimeHealth";
 import { createRequestId, logger } from "./observability/logger";
 import { buildOperationalDiagnostics } from "./observability/diagnostics";
+import { createTraceContext, serializeTraceparent, traceLogContext } from "./observability/tracing";
 import { getAdminApiToken } from "./security/securityConfig";
 
 function readAdminToken(req: express.Request) {
@@ -24,15 +26,25 @@ export function createWorkerApp() {
 
   app.use((req, res, next) => {
     const requestId = req.header("x-request-id") || createRequestId("worker");
+    const trace = createTraceContext(requestId, {
+      traceparent: req.header("traceparent"),
+      xTraceId: req.header("x-trace-id"),
+      xSpanId: req.header("x-span-id"),
+      xParentSpanId: req.header("x-parent-span-id"),
+    });
     const start = Date.now();
 
+    res.locals.trace = trace;
     res.setHeader("x-request-id", requestId);
+    res.setHeader("x-trace-id", trace.traceId);
+    res.setHeader("x-span-id", trace.spanId);
+    res.setHeader("traceparent", serializeTraceparent(trace));
     res.on("finish", () => {
       const duration = Date.now() - start;
       incrementCounter("workerRequests");
       recordTiming(`worker ${req.method} ${req.path}`, duration);
       logger.info("worker_request", {
-        requestId,
+        ...traceLogContext(trace),
         method: req.method,
         path: req.path,
         statusCode: res.statusCode,

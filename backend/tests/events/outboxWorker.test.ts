@@ -51,7 +51,13 @@ describe("outbox worker", () => {
     await runTelemetryOutboxCycle();
 
     expect(mockClaimPendingOutbox).toHaveBeenCalledTimes(1);
-    expect(mockPublishTelemetryBatchStrict).toHaveBeenCalledWith([record.payload]);
+    expect(mockPublishTelemetryBatchStrict).toHaveBeenCalledWith(
+      [record.payload],
+      expect.objectContaining({
+        traceId: expect.any(String),
+        spanId: expect.any(String),
+      })
+    );
     expect(mockMarkOutboxPublished).toHaveBeenCalledWith([record.id]);
     expect(mockMarkOutboxRetry).not.toHaveBeenCalled();
     expect(mockMarkOutboxDead).not.toHaveBeenCalled();
@@ -106,11 +112,58 @@ describe("outbox worker", () => {
 
     expect(mockPublishTelemetryBatchStrict).toHaveBeenCalledTimes(1);
     expect(mockPublishTelemetryBatchStrict).toHaveBeenCalledWith(
-      records.map((record) => record.payload)
+      records.map((record) => record.payload),
+      expect.objectContaining({
+        traceId: expect.any(String),
+        spanId: expect.any(String),
+      })
     );
     expect(mockMarkOutboxPublished).toHaveBeenCalledWith(["evt-1", "evt-2"]);
     expect(mockMarkOutboxRetry).not.toHaveBeenCalled();
     expect(mockMarkOutboxDead).not.toHaveBeenCalled();
+  });
+
+  it("uses persisted outbox trace context as the broker publish parent", async () => {
+    const record = {
+      id: "evt-traced",
+      payload: {
+        id: "evt-traced",
+        vehicle_id: "veh-1",
+        latitude: 19.43,
+        longitude: -99.13,
+        speed: 45,
+        status: "moving",
+        timestamp: 1700000000000,
+      },
+      trace: {
+        traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        spanId: "bbbbbbbbbbbbbbbb",
+        parentSpanId: null,
+        requestId: "req-test",
+        sampled: true,
+      },
+      status: "processing",
+      attempts: 1,
+      maxAttempts: 8,
+      nextAttemptAt: Date.now(),
+      lockedAt: Date.now(),
+      lastError: null,
+      publishedAt: null,
+    } as const;
+
+    mockClaimPendingOutbox.mockResolvedValue([record]);
+    mockPublishTelemetryBatchStrict.mockResolvedValue(undefined);
+
+    await runTelemetryOutboxCycle();
+
+    expect(mockPublishTelemetryBatchStrict).toHaveBeenCalledWith(
+      [record.payload],
+      expect.objectContaining({
+        traceId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        parentSpanId: "bbbbbbbbbbbbbbbb",
+        requestId: "req-test",
+      })
+    );
   });
 
   it("reschedules failed entries until they exhaust attempts", async () => {

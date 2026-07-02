@@ -1,4 +1,5 @@
 import type { TelemetryEvent } from "../types/telemetry";
+import type { TraceContext } from "../observability/tracing";
 
 export type TelemetryOutboxStatus =
   | "pending"
@@ -10,6 +11,7 @@ export type TelemetryOutboxStatus =
 export type TelemetryOutboxRecord = {
   id: string;
   payload: TelemetryEvent;
+  trace: TraceContext | null;
   status: TelemetryOutboxStatus;
   attempts: number;
   maxAttempts: number;

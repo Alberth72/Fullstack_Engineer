@@ -59,6 +59,9 @@ jobs:
       - name: Validate full Compose config
         run: docker compose -f infra/docker-compose.yml -f infra/docker-compose.full.yml --profile full config
 
+      - name: Validate observability Compose config
+        run: docker compose -f infra/docker-compose.yml -f infra/docker-compose.full.yml -f infra/docker-compose.observability.yml --profile full --profile observability config
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:

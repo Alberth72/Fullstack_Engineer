@@ -2,6 +2,7 @@ import { Router } from "express";
 import * as telemetryService from "../services/telemetryService";
 import { incrementCounter, snapshotMetrics } from "../observability/metrics";
 import { logger } from "../observability/logger";
+import { traceLogContext, type TraceContext } from "../observability/tracing";
 
 const router = Router();
 const DEFAULT_DEAD_LETTER_PRUNE_DAYS = 14;
@@ -13,19 +14,24 @@ function isValidationError(err: unknown) {
   );
 }
 
+function getTrace(res: { locals: Record<string, unknown> }) {
+  return res.locals.trace as TraceContext | undefined;
+}
+
 router.post("/event", async (req, res) => {
+  const trace = getTrace(res);
   try {
     const payload = req.body;
-    const event = await telemetryService.recordEvent(payload);
+    const event = await telemetryService.recordEvent(payload, trace);
     logger.info("telemetry_event_persisted", {
       vehicleId: event.vehicle_id,
-      requestId: req.header("x-request-id") || null,
+      ...traceLogContext(trace),
     });
     res.status(202).json({ status: "accepted", event });
   } catch (err) {
     incrementCounter("telemetryErrors");
     logger.error("telemetry_event_failed", err, {
-      requestId: req.header("x-request-id") || null,
+      ...traceLogContext(trace),
     });
     res.status(isValidationError(err) ? 400 : 500).json({
       error: isValidationError(err) ? "invalid_payload" : "internal_error",
@@ -34,18 +40,19 @@ router.post("/event", async (req, res) => {
 });
 
 router.post("/events/batch", async (req, res) => {
+  const trace = getTrace(res);
   try {
     const payload = req.body;
-    const events = await telemetryService.recordEvents(payload?.events ?? []);
+    const events = await telemetryService.recordEvents(payload?.events ?? [], trace);
     logger.info("telemetry_batch_persisted", {
       count: events.length,
-      requestId: req.header("x-request-id") || null,
+      ...traceLogContext(trace),
     });
     res.status(202).json({ status: "accepted", count: events.length });
   } catch (err) {
     incrementCounter("telemetryErrors");
     logger.error("telemetry_batch_failed", err, {
-      requestId: req.header("x-request-id") || null,
+      ...traceLogContext(trace),
     });
     res.status(isValidationError(err) ? 400 : 500).json({
       error: isValidationError(err) ? "invalid_payload" : "internal_error",

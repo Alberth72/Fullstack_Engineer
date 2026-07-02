@@ -14,10 +14,11 @@ import type {
   FleetVehicleDetail,
 } from "../../services/fleetReadModel";
 import type { TelemetryWriteResult } from "../../storage/telemetryWriteStats";
+import type { TraceContext } from "../../observability/tracing";
 
 export type TelemetryRepositoryPort = {
-  saveEvent(event: TelemetryEvent): Promise<TelemetryWriteResult | void>;
-  saveEvents(events: TelemetryEvent[]): Promise<TelemetryWriteResult | void>;
+  saveEvent(event: TelemetryEvent, trace?: TraceContext): Promise<TelemetryWriteResult | void>;
+  saveEvents(events: TelemetryEvent[], trace?: TraceContext): Promise<TelemetryWriteResult | void>;
   getFleetState(): Promise<FleetVehicleState[]>;
   getVehicleEvents(vehicleId: string, limit?: number): Promise<TelemetryEvent[]>;
   getFastestVehicles(minSpeed?: number, limit?: number): Promise<FastestVehiclesResult>;
@@ -44,8 +45,8 @@ export type TelemetryStats = {
 export type TelemetryClock = () => number;
 
 export type TelemetryApplication = {
-  recordEvent(payload: TelemetryEventInput): Promise<TelemetryEvent>;
-  recordEvents(payloads: TelemetryEventInput[]): Promise<TelemetryEvent[]>;
+  recordEvent(payload: TelemetryEventInput, trace?: TraceContext): Promise<TelemetryEvent>;
+  recordEvents(payloads: TelemetryEventInput[], trace?: TraceContext): Promise<TelemetryEvent[]>;
   getFleetState(): Promise<FleetVehicleState[]>;
   getFleetSnapshot(): Promise<FleetSnapshot>;
   getFleetSummary(): Promise<FleetSummary>;
@@ -65,5 +66,5 @@ export type TelemetryApplication = {
 };
 
 export type TelemetryOutboxNotifier = {
-  notify(events: TelemetryEvent[]): Promise<void>;
+  notify(events: TelemetryEvent[], trace?: TraceContext): Promise<void>;
 };

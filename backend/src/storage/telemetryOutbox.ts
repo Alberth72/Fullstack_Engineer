@@ -5,6 +5,7 @@ import type {
   TelemetryOutboxDeadLetterPruneOptions,
   TelemetryOutboxRecord,
 } from "./outboxTypes";
+import type { TraceContext } from "../observability/tracing";
 import { logger } from "../observability/logger";
 import { usePostgresStorage } from "./storageMode";
 
@@ -12,13 +13,13 @@ function isStorageFailure(err: unknown) {
   return err instanceof Error && !String(err.message || "").includes("invalid");
 }
 
-export async function saveEventsWithOutbox(events: TelemetryEvent[]) {
+export async function saveEventsWithOutbox(events: TelemetryEvent[], trace?: TraceContext) {
   if (!usePostgresStorage) {
-    return db.saveEventsWithOutbox(events);
+    return db.saveEventsWithOutbox(events, trace);
   }
 
   try {
-    return await pg.saveEventsWithOutbox(events);
+    return await pg.saveEventsWithOutbox(events, trace);
   } catch (err) {
     if (!isStorageFailure(err)) {
       throw err;
@@ -29,7 +30,7 @@ export async function saveEventsWithOutbox(events: TelemetryEvent[]) {
       eventCount: events.length,
       error: logger.serializeError(err),
     });
-    const result = db.saveEventsWithOutbox(events);
+    const result = db.saveEventsWithOutbox(events, trace);
     return {
       ...result,
       storage: "json_fallback" as const,

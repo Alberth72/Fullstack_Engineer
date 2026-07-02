@@ -17,6 +17,7 @@ import {
   type TelemetryWriteResult,
 } from "./telemetryWriteStats";
 import { getPostgresTelemetryRetentionDays } from "./telemetryRetentionPolicy";
+import type { TraceContext } from "../observability/tracing";
 
 const connectionString =
   process.env.DATABASE_URL || "postgres://fleet:fleet@localhost:5432/fleet";
@@ -77,6 +78,7 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS telemetry_outbox (
       id TEXT PRIMARY KEY,
       payload JSONB NOT NULL,
+      trace_context JSONB NULL,
       status TEXT NOT NULL DEFAULT 'pending',
       attempts INTEGER NOT NULL DEFAULT 0,
       max_attempts INTEGER NOT NULL DEFAULT 8,
@@ -90,8 +92,19 @@ async function ensureSchema() {
   `);
 
   await pool.query(`
+    ALTER TABLE telemetry_outbox
+    ADD COLUMN IF NOT EXISTS trace_context JSONB NULL;
+  `);
+
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_telemetry_outbox_pending
     ON telemetry_outbox (status, next_attempt_at, created_at);
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_telemetry_outbox_trace_id
+    ON telemetry_outbox ((trace_context->>'traceId'))
+    WHERE trace_context IS NOT NULL;
   `);
 
   await pool.query(`
@@ -356,7 +369,8 @@ export async function insertEvents(events: TelemetryEvent[]) {
 }
 
 export async function saveEventsWithOutbox(
-  events: TelemetryEvent[]
+  events: TelemetryEvent[],
+  trace?: TraceContext
 ): Promise<TelemetryWriteResult> {
   if (!events.length) return emptyTelemetryWriteResult("postgres");
 
@@ -420,15 +434,15 @@ export async function saveEventsWithOutbox(
         const outboxValues: unknown[] = [];
         const outboxRows = chunk
           .map((event, index) => {
-            const base = index * 2;
-            outboxValues.push(event.id, JSON.stringify(event));
-            return `($${base + 1}, $${base + 2}::jsonb)`;
+            const base = index * 3;
+            outboxValues.push(event.id, JSON.stringify(event), trace ? JSON.stringify(trace) : null);
+            return `($${base + 1}, $${base + 2}::jsonb, $${base + 3}::jsonb)`;
           })
           .join(", ");
 
         await client.query(
           `
-          INSERT INTO telemetry_outbox (id, payload)
+          INSERT INTO telemetry_outbox (id, payload, trace_context)
           VALUES ${outboxRows}
           ON CONFLICT (id) DO NOTHING
           RETURNING id
@@ -619,6 +633,7 @@ export async function claimPendingOutbox(limit: number, lockTimeoutMs: number) {
     const result = await pool.query<{
       id: string;
       payload: TelemetryEvent;
+      trace_context: TraceContext | null;
       attempts: number;
       max_attempts: number;
       status: string;
@@ -648,6 +663,7 @@ export async function claimPendingOutbox(limit: number, lockTimeoutMs: number) {
       RETURNING
         outbox.id,
         outbox.payload,
+        outbox.trace_context,
         outbox.attempts,
         outbox.max_attempts,
         outbox.status,
@@ -665,6 +681,7 @@ export async function claimPendingOutbox(limit: number, lockTimeoutMs: number) {
     return result.rows.map((row) => ({
       id: row.id,
       payload: row.payload,
+      trace: row.trace_context ?? null,
       status: row.status as TelemetryOutboxRecord["status"],
       attempts: row.attempts,
       maxAttempts: row.max_attempts,

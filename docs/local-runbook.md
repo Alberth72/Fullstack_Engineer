@@ -29,6 +29,15 @@ docker compose -f docker-compose.yml -f docker-compose.full.yml --profile full u
 Este modo conecta el backend con TimescaleDB y RabbitMQ, habilita el worker y deja el simulador en 5 vehiculos para recuperar la demo operativa mas parecida a la anterior.
 El arranque full ahora espera salud real de Postgres y RabbitMQ antes de levantar backend, worker y simulador, y el broker reintenta conexion si Rabbit tarda en quedar disponible.
 
+### Modo full con observabilidad visual
+Si necesitas ver trazas historicas y spans en Grafana:
+```bash
+cd infra
+docker compose -f docker-compose.yml -f docker-compose.full.yml -f docker-compose.observability.yml --profile full --profile observability up --build
+```
+
+Este modo agrega OpenTelemetry Collector, Grafana Tempo y Grafana. El backend y el worker exportan trazas OTLP hacia `otel-collector:4318` solo en este override.
+
 ## URLs locales
 | Servicio | URL |
 | --- | --- |
@@ -42,8 +51,11 @@ El arranque full ahora espera salud real de Postgres y RabbitMQ antes de levanta
 | Worker health | http://localhost:4002/health |
 | RabbitMQ Management | http://localhost:15672 |
 | PostgreSQL / TimescaleDB | localhost:5432 |
+| Grafana traces | http://localhost:3001 |
+| Tempo API | http://localhost:3200 |
+| OpenTelemetry Collector OTLP HTTP | http://localhost:4318 |
 
-Los tres ultimos servicios solo existen cuando levantas el modo completo con `docker compose -f docker-compose.yml -f docker-compose.full.yml --profile full up --build`.
+RabbitMQ, PostgreSQL, worker y simulador solo existen cuando levantas el modo completo. Grafana, Tempo y Collector solo existen cuando agregas `docker-compose.observability.yml` y el perfil `observability`.
 
 Credenciales locales por defecto:
 - RabbitMQ: `guest / guest`
@@ -80,6 +92,28 @@ La respuesta incluye:
 - `alerts`: lista accionable con `severity`, `code`, `source`, `message`, `count` y contexto opcional.
 
 Las alertas actuales se derivan de dependencias configuradas no conectadas, errores de ingesta/publicacion, dead letters del outbox, circuit breaker del notificador, reintentos, errores del agente y logs recientes `warn`/`error`.
+
+## Trazas distribuidas
+El backend y el worker aceptan `traceparent`, `X-Trace-Id`, `X-Span-Id` y `X-Request-Id`. Si no llegan, generan una traza local y devuelven estos headers en la respuesta:
+
+```bash
+curl http://localhost:4001/health -H "traceparent: 00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01" -i
+```
+
+La traza se propaga por API, capa de aplicacion, outbox, notificacion HTTP al worker, publicacion RabbitMQ y broadcast WebSocket. En PostgreSQL el outbox guarda la metadata en `telemetry_outbox.trace_context`; en fallback JSON queda en `backend/data/outbox.json`.
+
+Cuando `OTEL_EXPORTER_OTLP_ENDPOINT` o `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` esta configurado, backend y worker inician OpenTelemetry SDK para Node.js y exportan spans al Collector. En el modo observability local:
+- Backend usa `OTEL_SERVICE_NAME=fleet-backend`.
+- Worker usa `OTEL_SERVICE_NAME=fleet-outbox-worker`.
+- Collector recibe OTLP HTTP en `4318` y OTLP gRPC en `4317`.
+- Tempo conserva trazas locales por 24 horas.
+- Grafana queda disponible en `http://localhost:3001` con datasource Tempo preconfigurado.
+
+La migracion versionada para esta columna vive en:
+
+```text
+backend/migrations/002_outbox_trace_context.sql
+```
 
 ## Operacion del outbox
 Consulta el estado operativo del outbox:
@@ -135,7 +169,7 @@ Las workflows de GitHub Actions ya estan en el repo, pero desde esta sesion no d
 ## Validacion CI
 La workflow `project-ci` valida cuatro frentes:
 - backend: tests unitarios/rutas, build e integracion con TimescaleDB y RabbitMQ en Compose
-- infra: `docker compose config` para modo liviano y full, mas `terraform fmt -check`
+- infra: `docker compose config` para modo liviano, full y observability, mas `terraform fmt -check`
 - frontend: tests Vitest y build Next.js
 - mobile: typecheck y smoke test offline-first
 

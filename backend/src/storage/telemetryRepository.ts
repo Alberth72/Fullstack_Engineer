@@ -5,18 +5,18 @@ import { logger } from "../observability/logger";
 import { usePostgresStorage } from "./storageMode";
 
 export const telemetryRepository: TelemetryRepositoryPort = {
-  async saveEvent(event) {
-    return telemetryRepository.saveEvents([event]);
+  async saveEvent(event, trace) {
+    return telemetryRepository.saveEvents([event], trace);
   },
-  async saveEvents(events) {
+  async saveEvents(events, trace) {
     if (!events.length) return;
 
     if (!usePostgresStorage) {
-      return db.saveEventsWithOutbox(events);
+      return db.saveEventsWithOutbox(events, trace);
     }
 
     try {
-      return await pg.saveEventsWithOutbox(events);
+      return await pg.saveEventsWithOutbox(events, trace);
     } catch (err) {
       logger.warn("postgres_fallback_to_json", {
         component: "telemetry_repository",
@@ -24,7 +24,7 @@ export const telemetryRepository: TelemetryRepositoryPort = {
         eventCount: events.length,
         error: logger.serializeError(err),
       });
-      const result = db.saveEventsWithOutbox(events);
+      const result = db.saveEventsWithOutbox(events, trace);
       return {
         ...result,
         storage: "json_fallback" as const,

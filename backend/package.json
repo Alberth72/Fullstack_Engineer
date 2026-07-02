@@ -18,6 +18,11 @@
   },
   "dependencies": {
     "@langchain/openai": "^1.5.3",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.77.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
+    "@opentelemetry/resources": "^2.8.0",
+    "@opentelemetry/sdk-node": "^0.219.0",
     "@types/amqplib": "^0.10.8",
     "@types/pg": "^8.20.0",
     "amqplib": "^2.0.1",

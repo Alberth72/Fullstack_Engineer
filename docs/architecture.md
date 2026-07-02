@@ -12,7 +12,7 @@ El proyecto ya no es solo un prototipo de pantalla. La base actual es un portal 
 - dashboard Next.js con mapa, alertas, salud y chat IA
 - agente IA integrado al backend con tools internas
 - trazas persistidas de agente y conversaciones por `conversationId`
-- observabilidad con health, metrics, diagnostics, alertas operativas, request ids, logs estructurados y buffer reciente de problemas
+- observabilidad con health, metrics, diagnostics, alertas operativas, trazas distribuidas livianas, export OTLP opcional, request ids, logs estructurados y buffer reciente de problemas
 
 ## Stack tecnologico
 | Capa | Tecnologia | Rol |
@@ -188,6 +188,10 @@ El backend expone vistas derivadas en lugar de obligar al frontend a reconstruir
 - `GET /api/telemetry/admin/retention` expone la politica efectiva de retencion Timescale y compactacion JSON.
 - `GET /api/telemetry/admin/storage/readiness` expone si TimescaleDB esta instalado, si `telemetry_events` es hypertable, columnas de primary key y bloqueadores de migracion.
 - Cada request recibe `x-request-id`.
+- Cada request recibe `traceparent`, `x-trace-id` y `x-span-id`; si el cliente envia `traceparent`, el backend conserva el `traceId` y crea un span local.
+- La traza viaja por la ruta API -> aplicacion -> outbox -> worker -> RabbitMQ/WebSocket. El outbox persiste `trace_context` para sobrevivir al salto asincrono.
+- Si `OTEL_EXPORTER_OTLP_ENDPOINT` esta configurado, API y worker arrancan OpenTelemetry SDK para Node.js y exportan spans hacia un Collector.
+- `infra/docker-compose.observability.yml` agrega OpenTelemetry Collector, Grafana Tempo y Grafana para visualizacion local de spans.
 - El logger conserva un buffer pequeno de problemas recientes para correlacion rapida sin depender solo del stdout.
 - Simulador, fallback JSON y adaptadores de fallback Postgres->JSON emiten logs estructurados con `logger` en lugar de `console.*`.
 - Broker, worker y DB usan retries y circuit breaker simple.
@@ -222,5 +226,5 @@ Con el lote ya tenemos una ruta mucho mas realista para probar 10.000 vehiculos 
 1. Falta validar el rendimiento real de TimescaleDB y RabbitMQ con mas volumen.
 2. Falta ejecutar la migracion formal de hypertable en un ambiente full con datos reales; el SQL y el runtime compatible ya estan versionados.
 3. Falta completar la conexion de secrets y ejecutar el apply real en AWS, aunque IaC y la pipeline de ECR ya tienen una base real en Terraform y GitHub Actions.
-4. Falta trazabilidad distribuida completa; diagnostics, alertas operativas y logs secundarios estructurados ya cubren resumen operacional y ultimos problemas.
+4. Falta elegir un proveedor APM administrado para produccion si se requiere retencion historica fuera del stack local; diagnostics, alertas operativas, trazas livianas, Collector/Tempo local y logs secundarios estructurados ya cubren correlacion operacional del MVP.
 5. Falta validar la estrategia del worker bajo carga extrema con resultados de k6.

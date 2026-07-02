@@ -1,6 +1,7 @@
 import axios from "axios";
 import { incrementCounter } from "../observability/metrics";
 import { logger } from "../observability/logger";
+import { createChildTraceContext, traceHeaders, traceLogContext, type TraceContext } from "../observability/tracing";
 import type { TelemetryEvent } from "../types/telemetry";
 import { CircuitBreaker, withRetry } from "../utils/resilience";
 import { getAdminApiToken } from "../security/securityConfig";
@@ -25,7 +26,7 @@ function describeError(err: unknown) {
   return err instanceof Error ? err.message : String(err);
 }
 
-export async function notifyTelemetryOutboxWorker(events: TelemetryEvent[]) {
+export async function notifyTelemetryOutboxWorker(events: TelemetryEvent[], trace?: TraceContext) {
   const workerUrl = getWorkerUrl();
   if (!workerUrl || !events.length) {
     incrementCounter("outboxNotificationsSkipped");
@@ -39,6 +40,11 @@ export async function notifyTelemetryOutboxWorker(events: TelemetryEvent[]) {
 
   const endpoint = `${workerUrl}${getNotifyPath()}`;
   const adminToken = getAdminApiToken();
+  const notificationTrace = trace ? createChildTraceContext(trace) : undefined;
+  const headers = {
+    ...(adminToken ? { "X-Admin-Token": adminToken } : {}),
+    ...(notificationTrace ? traceHeaders(notificationTrace) : {}),
+  };
 
   try {
     await withRetry(
@@ -48,9 +54,10 @@ export async function notifyTelemetryOutboxWorker(events: TelemetryEvent[]) {
           {
             count: events.length,
             eventIds: events.map((event) => event.id),
+            trace: notificationTrace ?? null,
           },
           {
-            headers: adminToken ? { "X-Admin-Token": adminToken } : undefined,
+            headers: Object.keys(headers).length ? headers : undefined,
             timeout: parseInt(process.env.OUTBOX_WORKER_TIMEOUT_MS || "3000", 10),
             validateStatus: (status) => status >= 200 && status < 300,
           }
@@ -73,6 +80,7 @@ export async function notifyTelemetryOutboxWorker(events: TelemetryEvent[]) {
     notifierBreaker.failure();
     incrementCounter("outboxNotificationsFailed");
     logger.warn("outbox_notification_failed", {
+      ...traceLogContext(notificationTrace),
       error: describeError(err),
       workerUrl: workerUrl || null,
       eventCount: events.length,

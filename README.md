@@ -19,7 +19,7 @@ MVP para monitoreo de flotas con ingesta de telemetria, agente IA, dashboard ope
 - Frontend: Next.js 13.4, React 18, react-leaflet, leaflet, TypeScript.
 - Datos: TimescaleDB sobre PostgreSQL, con fallback JSON local.
 - Mensajeria: RabbitMQ.
-- Observabilidad: `/health`, `/metrics`, `/diagnostics`, alertas operativas, request ids, counters y timings.
+- Observabilidad: `/health`, `/metrics`, `/diagnostics`, alertas operativas, trazas distribuidas livianas, export OTLP opcional, request ids, counters y timings.
 - Infra: Docker Compose, k6, Terraform para AWS, ECR, ECS/Fargate y GitHub Actions CD.
 - Mobile: Expo/React Native offline-first con TypeScript, SQLite, cola local y sync batch contra el backend.
 
@@ -52,6 +52,14 @@ docker compose -f docker-compose.yml -f docker-compose.full.yml --profile full u
 ```
 
 Con `full` se levantan PostgreSQL / TimescaleDB, RabbitMQ, worker y simulador, y el backend ya queda apuntando a esos servicios. El simulador arranca con 5 vehiculos para mantener la demo mas cercana al flujo de antes.
+
+### Opcion completa con trazas visuales
+```bash
+cd infra
+docker compose -f docker-compose.yml -f docker-compose.full.yml -f docker-compose.observability.yml --profile full --profile observability up --build
+```
+
+Agrega OpenTelemetry Collector, Grafana Tempo y Grafana. Grafana queda en `http://localhost:3001` con Tempo preconfigurado para explorar spans del backend y del worker.
 
 Para una guia de prueba completa con URLs y flujo de verificacion, revisa [docs/local-runbook.md](/D:/Github/Fullstack_Engineer/docs/local-runbook.md).
 
@@ -182,7 +190,7 @@ Revisa [docs/continuous-deployment.md](/D:/Github/Fullstack_Engineer/docs/contin
 - Completar mobile offline-first con captura GPS real en background, permisos, pruebas en dispositivo y CI/CD movil.
 - CD movil con artefactos instalables y distribucion controlada; backend/frontend ya tienen CI y despliegue continuo hacia AWS.
 - Validacion de carga y resiliencia con mas volumen real sobre TimescaleDB y RabbitMQ, incluyendo escenarios con lote.
-- Observabilidad mas completa con trazas distribuidas.
+- Elegir proveedor APM administrado para produccion si se requiere retencion, alertas y correlacion historica fuera del stack local.
 - Cierre incremental de Backend / Events documentado en `docs/backend-events-workflow.md`.
 
 ## Estructura del repo

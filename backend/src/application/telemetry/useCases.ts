@@ -15,6 +15,7 @@ import { TelemetryApplication, TelemetryClock, TelemetryRepositoryPort } from ".
 import type { TelemetryOutboxNotifier } from "./ports";
 import { TelemetryEvent, TelemetryEventInput } from "../../types/telemetry";
 import type { TelemetryWriteResult } from "../../storage/telemetryWriteStats";
+import type { TraceContext } from "../../observability/tracing";
 
 function recordTelemetryWriteMetrics(result: TelemetryWriteResult | void, inputDuplicates = 0) {
   if (!result) return;
@@ -36,21 +37,27 @@ export function createTelemetryApplication(deps: {
 }): TelemetryApplication {
   const now = deps.clock ?? Date.now;
 
-  const recordEvents = async (payloads: TelemetryEventInput[]): Promise<TelemetryEvent[]> => {
+  const recordEvents = async (
+    payloads: TelemetryEventInput[],
+    trace?: TraceContext
+  ): Promise<TelemetryEvent[]> => {
     const events = buildTelemetryEvents(payloads);
     const inputDuplicates = Math.max(0, payloads.length - events.length);
-    const writeResult = await deps.repository.saveEvents(events);
+    const writeResult = await deps.repository.saveEvents(events, trace);
     recordTelemetryWriteMetrics(writeResult, inputDuplicates);
     if (deps.outboxNotifier) {
-      await deps.outboxNotifier.notify(events);
+      await deps.outboxNotifier.notify(events, trace);
     }
     incrementCounter("telemetryEventsReceived", payloads.length);
     incrementCounter("telemetryEvents", events.length);
     return events;
   };
 
-  const recordEvent = async (payload: TelemetryEventInput): Promise<TelemetryEvent> => {
-    const events = await recordEvents([payload]);
+  const recordEvent = async (
+    payload: TelemetryEventInput,
+    trace?: TraceContext
+  ): Promise<TelemetryEvent> => {
+    const events = await recordEvents([payload], trace);
     return events[0]!;
   };
 

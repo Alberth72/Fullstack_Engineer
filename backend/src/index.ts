@@ -1,3 +1,4 @@
+import "./observability/otel";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import { createApp } from "./app";

@@ -11,6 +11,7 @@ import {
 import { probeRuntimeHealth } from "./observability/runtimeHealth";
 import { createRequestId, logger } from "./observability/logger";
 import { buildOperationalDiagnostics } from "./observability/diagnostics";
+import { createTraceContext, serializeTraceparent, traceLogContext } from "./observability/tracing";
 import {
   getAdminApiToken,
   getCorsConfig,
@@ -54,15 +55,25 @@ export function createApp() {
 
   app.use((req, res, next) => {
     const requestId = req.header("x-request-id") || createRequestId();
+    const trace = createTraceContext(requestId, {
+      traceparent: req.header("traceparent"),
+      xTraceId: req.header("x-trace-id"),
+      xSpanId: req.header("x-span-id"),
+      xParentSpanId: req.header("x-parent-span-id"),
+    });
     const start = Date.now();
 
+    res.locals.trace = trace;
     res.setHeader("x-request-id", requestId);
+    res.setHeader("x-trace-id", trace.traceId);
+    res.setHeader("x-span-id", trace.spanId);
+    res.setHeader("traceparent", serializeTraceparent(trace));
     res.on("finish", () => {
       const duration = Date.now() - start;
       incrementCounter("requests");
       recordTiming(`${req.method} ${req.path}`, duration);
       logger.info("http_request", {
-        requestId,
+        ...traceLogContext(trace),
         method: req.method,
         path: req.path,
         statusCode: res.statusCode,

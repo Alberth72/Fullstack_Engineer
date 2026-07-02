@@ -71,6 +71,19 @@ describe("system routes", () => {
     });
   });
 
+  it("returns trace headers for distributed correlation", async () => {
+    const res = await request(createApp())
+      .get("/health")
+      .set("traceparent", "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01");
+
+    expect(res.status).toBe(200);
+    expect(res.headers["x-trace-id"]).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(res.headers["x-span-id"]).toEqual(expect.any(String));
+    expect(res.headers.traceparent).toMatch(
+      /^00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-[a-f0-9]{16}-01$/
+    );
+  });
+
   it("returns protected operational diagnostics", async () => {
     process.env.ADMIN_API_TOKEN = "secret-token";
     logger.warn("diagnostic_test_warning", { requestId: "req-test" });

@@ -12,6 +12,7 @@ import {
 import * as telemetryService from "../services/telemetryService";
 import { incrementCounter } from "../observability/metrics";
 import { logger } from "../observability/logger";
+import { traceLogContext, type TraceContext } from "../observability/tracing";
 
 const router = Router();
 
@@ -24,7 +25,12 @@ function readLimit(value: unknown) {
   return Math.min(Math.floor(parsed), max);
 }
 
+function getTrace(res: { locals: Record<string, unknown> }) {
+  return res.locals.trace as TraceContext | undefined;
+}
+
 router.post("/query", async (req, res) => {
+  const trace = getTrace(res);
   try {
     const { question, specialist, conversationId } = req.body;
     if (!question) return res.status(400).json({ error: "missing_question" });
@@ -69,7 +75,7 @@ router.post("/query", async (req, res) => {
     await persistAgentExecution(execution);
     incrementCounter("agentQueries");
     logger.info("agent_query_processed", {
-      requestId: req.header("x-request-id") || null,
+      ...traceLogContext(trace),
       conversationId: execution.trace.conversationId,
       mode: execution.trace.mode,
       specialist: execution.answer.specialist,
@@ -87,13 +93,14 @@ router.post("/query", async (req, res) => {
   } catch (err) {
     incrementCounter("agentErrors");
     logger.error("agent_query_failed", err, {
-      requestId: req.header("x-request-id") || null,
+      ...traceLogContext(trace),
     });
     res.status(500).json({ error: "agent_error" });
   }
 });
 
 router.get("/conversations/:conversationId/traces", async (req, res) => {
+  const trace = getTrace(res);
   try {
     const conversationId = req.params.conversationId?.trim();
     if (!conversationId) return res.status(400).json({ error: "missing_conversation_id" });
@@ -108,7 +115,7 @@ router.get("/conversations/:conversationId/traces", async (req, res) => {
   } catch (err) {
     incrementCounter("agentErrors");
     logger.error("agent_audit_traces_failed", err, {
-      requestId: req.header("x-request-id") || null,
+      ...traceLogContext(trace),
       conversationId: req.params.conversationId || null,
     });
     res.status(500).json({ error: "agent_audit_error" });

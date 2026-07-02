@@ -17,6 +17,7 @@ import {
 } from "./telemetryWriteStats";
 import { getAgentAuditConfig } from "../agent/agentAuditConfig";
 import { logger } from "../observability/logger";
+import type { TraceContext } from "../observability/tracing";
 import { getJsonStorageMaxEventsPerVehicle } from "./telemetryRetentionPolicy";
 
 const dataDir = path.resolve(__dirname, "../../data");
@@ -122,7 +123,10 @@ export function insertEvents(events: TelemetryEvent[]) {
   writeAll(compactEvents(Array.from(byId.values())));
 }
 
-export function saveEventsWithOutbox(events: TelemetryEvent[]): TelemetryWriteResult {
+export function saveEventsWithOutbox(
+  events: TelemetryEvent[],
+  trace?: TraceContext
+): TelemetryWriteResult {
   if (!events.length) return emptyTelemetryWriteResult("json");
 
   const currentEvents = readAll();
@@ -161,6 +165,7 @@ export function saveEventsWithOutbox(events: TelemetryEvent[]): TelemetryWriteRe
     outboxById.set(event.id, {
       id: event.id,
       payload: event,
+      trace: trace ?? null,
       status: "pending",
       attempts: 0,
       maxAttempts: 8,
